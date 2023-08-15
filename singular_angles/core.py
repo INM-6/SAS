@@ -54,7 +54,9 @@ class SingularAngles():
         U_a, S_a, V_at = np.linalg.svd(matrix_a)
         U_b, S_b, V_bt = np.linalg.svd(matrix_b)
 
-        angles = (self.angle(U_a, U_b, method='columns') + self.angle(V_at, V_bt, method='rows')) / 2
+        angles_noflip = (self.angle(U_a, U_b, method='columns') + self.angle(V_at, V_bt, method='rows')) / 2
+        angles_flip = np.pi - angles_noflip
+        angles = np.minimum(angles_noflip, angles_flip)
         weights = (S_a + S_b) / 2
         smallness = 1 - angles / (np.pi / 2)
         weighted_smallness = smallness * weights
@@ -88,9 +90,6 @@ class SingularAngles():
         magnitude_a = np.linalg.norm(a, axis=axis)
         magnitude_b = np.linalg.norm(b, axis=axis)
         angle = np.arccos(dot_product / (magnitude_a * magnitude_b))
-
-        # angles larger than pi/2 are reflected at pi/2
-        angle[angle > np.pi / 2] = np.pi / 2 - (angle[angle > np.pi / 2] - np.pi / 2)
 
         return angle
 
