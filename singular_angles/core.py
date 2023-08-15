@@ -54,6 +54,15 @@ class SingularAngles():
         U_a, S_a, V_at = np.linalg.svd(matrix_a)
         U_b, S_b, V_bt = np.linalg.svd(matrix_b)
 
+        # if the matrices are rectangular, disregard the singular vectors of the larger singular matrix that map to 0
+        dim_0, dim_1 = matrix_a.shape
+        if dim_0 < dim_1:
+            V_at = V_at[:dim_0, :]
+            V_bt = V_bt[:dim_0, :]
+        elif dim_0 > dim_1:
+            U_a = U_a[:, :dim_1]
+            U_b = U_b[:, :dim_1]
+
         angles_noflip = (self.angle(U_a, U_b, method='columns') + self.angle(V_at, V_bt, method='rows')) / 2
         angles_flip = np.pi - angles_noflip
         angles = np.minimum(angles_noflip, angles_flip)
