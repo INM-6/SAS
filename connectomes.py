@@ -12,7 +12,7 @@ mpl.rcParams['pdf.fonttype'] = 42
 sns.set(font='Avenir')
 
 
-def clustered_connectome(total_size, clusters, rel_cluster_weights, mean_connection_prob):
+def clustered_connectome(size, clusters, rel_cluster_weights, mean_connection_prob):
     mean_num_connections = mean_connection_prob * size[0] * size[1]
     connectome = np.ones(size)
     for cluster, rel_cluster_weight in zip(clusters, rel_cluster_weights):
@@ -20,7 +20,7 @@ def clustered_connectome(total_size, clusters, rel_cluster_weights, mean_connect
     return connectome / (np.sum(connectome) / mean_num_connections)
 
 
-def erdos_renyi_connectome(total_size, mean_connection_prob):
+def erdos_renyi_connectome(size, mean_connection_prob):
     return np.ones(size) * mean_connection_prob
 
 
@@ -34,16 +34,28 @@ def plot_connectome(connectome, name):
     plt.savefig(f'plots/{name}.png', dpi=600)
 
 
-size = (100, 100)
+size_square = (100, 100)
+size_rectangular = (50, 200)
 mean_connection_prob = 0.1
 
-connectomes = {}
-connectomes['ER'] = erdos_renyi_connectome(size, mean_connection_prob)
-connectomes['one_cluster'] = clustered_connectome(size, clusters=[(0, 10)], rel_cluster_weights=[100],
-                                                  mean_connection_prob=mean_connection_prob)
-connectomes['two_clusters'] = clustered_connectome(size, clusters=[(20, 30), (40, 50)], rel_cluster_weights=[50, 50],
-                                                   mean_connection_prob=mean_connection_prob)
+connectomes_square = {}
+connectomes_square['ER'] = erdos_renyi_connectome(size_square, mean_connection_prob)
+connectomes_square['one_cluster'] = clustered_connectome(size_square, clusters=[(0, 10)], rel_cluster_weights=[100],
+                                                         mean_connection_prob=mean_connection_prob)
+connectomes_square['two_clusters'] = clustered_connectome(size_square, clusters=[(20, 30), (40, 50)],
+                                                          rel_cluster_weights=[20, 80],
+                                                          mean_connection_prob=mean_connection_prob)
 
+connectomes_rectangular = {}
+connectomes_rectangular['ER'] = erdos_renyi_connectome(size_rectangular, mean_connection_prob)
+connectomes_rectangular['one_cluster'] = clustered_connectome(size_rectangular, clusters=[(0, 10)],
+                                                              rel_cluster_weights=[100],
+                                                              mean_connection_prob=mean_connection_prob)
+connectomes_rectangular['two_clusters'] = clustered_connectome(size_rectangular, clusters=[(20, 30), (40, 50)],
+                                                               rel_cluster_weights=[20, 80],
+                                                               mean_connection_prob=mean_connection_prob)
+
+connectome_dict = {'square': connectomes_square, 'rectangular': connectomes_rectangular}
 
 # ------- CALCULATE SIMILARITY SCORES FOR CONNECTOMES -------
 
@@ -51,15 +63,18 @@ singular_angles = SingularAngles()
 
 # plot instantiated connectomes
 os.makedirs('plots', exist_ok=True)
-for name, connectome in connectomes.items():
-    plot_connectome(connectome=singular_angles.draw(connectome, repetitions=1)[0], name=name)
-
 # compare all connectomes with each other
 scores = {}
-for rule_1, rule_2 in combinations_with_replacement(connectomes.keys(), 2):
-    scores[f'{rule_1}-{rule_2}'] = singular_angles.similarity(connectomes[rule_1], connectomes[rule_2])
-    print(f"The similarity of {rule_1} and {rule_2} is {np.round(np.mean(scores[f'{rule_1}-{rule_2}']), 2)} ± "
-          f"{np.round(np.std(scores[f'{rule_1}-{rule_2}']), 2)}")
+for connectome_type, connectomes in connectome_dict.items():
+    for name, connectome in connectomes.items():
+        plot_connectome(connectome=singular_angles.draw(connectome, repetitions=1)[0], name=name)
+
+    scores[connectome_type] = {}
+    for rule_1, rule_2 in combinations_with_replacement(connectomes.keys(), 2):
+        score = singular_angles.similarity(connectomes[rule_1], connectomes[rule_2])
+        scores[connectome_type][f'{rule_1}-{rule_2}'] = score
+        print(f"The similarity of {rule_1} and {rule_2} is {np.round(np.mean(score), 2)} ± "
+              f"{np.round(np.std(score), 2)}")
 
 # ------- PLOT SIMILARITY SCORES FOR CONNECTOMES -------
 
@@ -80,6 +95,9 @@ labels = {
     'two_clusters-two_clusters': 'two clusters - two clusters',
 }
 
-fig, ax = plt.subplots()
-ax = singular_angles.plot_similarities(similarity_scores=scores, colors=colors, labels=labels, ax=ax)
-plt.savefig('plots/similarity_scores.png', dpi=600)
+for connectome_type, connectomes in connectome_dict.items():
+    fig, ax = plt.subplots()
+    ax = singular_angles.plot_similarities(similarity_scores=scores[connectome_type], colors=colors,
+                                           labels=labels, ax=ax)
+    ax.set_title(connectome_type)
+    plt.savefig(f'plots/similarity_scores_{connectome_type}.png', dpi=600)
