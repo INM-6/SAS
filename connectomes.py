@@ -5,11 +5,12 @@ import matplotlib as mpl
 from itertools import combinations_with_replacement
 from singular_angles import SingularAngles
 import os
+import networkx as nx
 
 
 # set fonttype so Avenir can be used with pdf format
 mpl.rcParams['pdf.fonttype'] = 42
-sns.set(font='Avenir')
+sns.set(font='Avenir', style="ticks")
 
 
 def clustered_connectome(size, clusters, rel_cluster_weights, mean_connection_prob):
@@ -30,6 +31,27 @@ def shuffle(matrix, np_seed=1):
 
 def erdos_renyi_connectome(size, mean_connection_prob):
     return np.ones(size) * mean_connection_prob
+
+
+def directed_configuration_model(size, mean_connection_prob, np_seed=1):
+    np.random.seed(np_seed)
+    total_connections = mean_connection_prob * size[0] * size[1]
+    indegrees = np.random.randint(low=0, high=total_connections + 1, size=size[0])
+    indegrees = np.round(indegrees / np.sum(indegrees) * total_connections).astype(int)
+    outdegrees = np.random.permutation(indegrees)
+
+    graph = nx.directed_configuration_model(in_degree_sequence=indegrees, out_degree_sequence=outdegrees)
+    graph.remove_edges_from(nx.selfloop_edges(graph))
+
+    while graph.number_of_edges() < total_connections:
+        nodes = np.random.choice(graph.nodes(), size=2, replace=False)
+        graph.add_edge(nodes[0], nodes[1])
+
+    while graph.number_of_edges() > total_connections:
+        edge = np.random.choice(graph.edges())
+        graph.remove_edge(*edge)
+
+    return nx.to_numpy_array(graph)
 
 
 def plot_connectome(connectome, name):
@@ -53,18 +75,19 @@ mean_num_connections_rectangular = mean_connection_prob * size_rectangular[0] * 
 
 connectomes_square = {}
 connectomes_square['ER'] = erdos_renyi_connectome(size_square, mean_connection_prob)
-connectomes_square['one_cluster'] = clustered_connectome(size_square, clusters=[(0, 10)], rel_cluster_weights=[100],
+connectomes_square['DCM'] = directed_configuration_model(size_square, mean_connection_prob)
+connectomes_square['one_cluster'] = clustered_connectome(size_square, clusters=[(0, 50)], rel_cluster_weights=[100],
                                                          mean_connection_prob=mean_connection_prob)
-connectomes_square['two_clusters'] = clustered_connectome(size_square, clusters=[(20, 30), (40, 50)],
+connectomes_square['two_clusters'] = clustered_connectome(size_square, clusters=[(50, 100), (100, 150)],
                                                           rel_cluster_weights=[20, 80],
                                                           mean_connection_prob=mean_connection_prob)
 
 connectomes_rectangular = {}
 connectomes_rectangular['ER'] = erdos_renyi_connectome(size_rectangular, mean_connection_prob)
-connectomes_rectangular['one_cluster'] = clustered_connectome(size_rectangular, clusters=[(0, 10)],
+connectomes_rectangular['one_cluster'] = clustered_connectome(size_rectangular, clusters=[(0, 50)],
                                                               rel_cluster_weights=[100],
                                                               mean_connection_prob=mean_connection_prob)
-connectomes_rectangular['two_clusters'] = clustered_connectome(size_rectangular, clusters=[(20, 30), (40, 50)],
+connectomes_rectangular['two_clusters'] = clustered_connectome(size_rectangular, clusters=[(50, 100), (100, 150)],
                                                                rel_cluster_weights=[20, 80],
                                                                mean_connection_prob=mean_connection_prob)
 
@@ -93,8 +116,18 @@ for connectome_type, connectomes in connectome_dict.items():
         scores[connectome_type][f'{rule_1}-{rule_2}'] = score
         print(f"The similarity of {rule_1} and {rule_2} is {np.round(np.mean(score), 2)} ± "
               f"{np.round(np.std(score), 2)}")
-
 # ------- PLOT SIMILARITY SCORES FOR CONNECTOMES -------
+
+colors_ER_DCM = {
+    'ER-ER': '#332288',
+    'ER-DCM': '#88CCEE',
+    'DCM-DCM': '#44AA99',
+}
+labels_ER_DCM = {
+    'ER-ER': 'ER - ER',
+    'ER-DCM': 'ER - DCM',
+    'DCM-DCM': 'DCM - DCM',
+}
 
 colors = {
     'ER-ER': '#332288',
@@ -121,6 +154,18 @@ labels = {
     'one_cluster_shuffled-one_cluster_shuffled': 'one cluster shuffled - one cluster shuffled',
 }
 
+# sqare matrix comparison of ER and DCM
+comparisons = ['ER-ER', 'ER-DCM', 'DCM-DCM']
+fig, ax = plt.subplots()
+ax = singular_angles.plot_similarities(
+    similarity_scores={key: scores['square'][key] for key in comparisons},
+    colors=colors_ER_DCM, labels=labels_ER_DCM, ax=ax)
+plt.savefig('plots/similarity_scores_ER_DCM.png', dpi=600)
+
+for key in [key for key in scores['square'].keys() if 'DCM' in key]:
+    del scores['square'][key]
+
+# all other comparisons
 for connectome_type, connectomes in connectome_dict.items():
     fig, ax = plt.subplots()
     ax = singular_angles.plot_similarities(similarity_scores=scores[connectome_type], colors=colors,
