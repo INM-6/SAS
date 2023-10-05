@@ -67,9 +67,10 @@ class SingularAngles():
         angles_flip = np.pi - angles_noflip
         angles = np.minimum(angles_noflip, angles_flip)
         weights = (S_a + S_b) / 2
+        weights /= np.sum(weights)
         smallness = 1 - angles / (np.pi / 2)
         weighted_smallness = smallness * weights
-        similarity_score = np.mean(weighted_smallness)
+        similarity_score = np.sum(weighted_smallness)
         return similarity_score
 
     def angle(self, a, b, method='columns'):
