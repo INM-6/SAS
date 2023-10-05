@@ -20,6 +20,14 @@ def clustered_connectome(size, clusters, rel_cluster_weights, mean_connection_pr
     return connectome / (np.sum(connectome) / mean_num_connections)
 
 
+def shuffle(matrix, np_seed=1):
+    np.random.seed(np_seed)
+    n, m = matrix.shape
+    flat_matrix = matrix.flatten()
+    np.random.shuffle(flat_matrix)
+    return flat_matrix.reshape(n, m)
+
+
 def erdos_renyi_connectome(size, mean_connection_prob):
     return np.ones(size) * mean_connection_prob
 
@@ -34,9 +42,14 @@ def plot_connectome(connectome, name):
     plt.savefig(f'plots/{name}.png', dpi=600)
 
 
-size_square = (100, 100)
-size_rectangular = (50, 200)
+size_square = (300, 300)
+size_rectangular = (200, 450)
 mean_connection_prob = 0.1
+shuffle_ = True
+
+mean_num_connections_square = mean_connection_prob * size_square[0] * size_square[1]
+mean_num_connections_rectangular = mean_connection_prob * size_rectangular[0] * size_rectangular[1]
+
 
 connectomes_square = {}
 connectomes_square['ER'] = erdos_renyi_connectome(size_square, mean_connection_prob)
@@ -55,6 +68,10 @@ connectomes_rectangular['two_clusters'] = clustered_connectome(size_rectangular,
                                                                rel_cluster_weights=[20, 80],
                                                                mean_connection_prob=mean_connection_prob)
 
+if shuffle_:
+    connectomes_square['one_cluster_shuffled'] = shuffle(connectomes_square['one_cluster'])
+    connectomes_rectangular['one_cluster_shuffled'] = shuffle(connectomes_rectangular['one_cluster'])
+
 connectome_dict = {'square': connectomes_square, 'rectangular': connectomes_rectangular}
 
 # ------- CALCULATE SIMILARITY SCORES FOR CONNECTOMES -------
@@ -67,7 +84,8 @@ os.makedirs('plots', exist_ok=True)
 scores = {}
 for connectome_type, connectomes in connectome_dict.items():
     for name, connectome in connectomes.items():
-        plot_connectome(connectome=singular_angles.draw(connectome, repetitions=1)[0], name=name)
+        plot_connectome(connectome=singular_angles.draw(connectome, repetitions=1)
+                        [0], name=connectome_type + '_' + name)
 
     scores[connectome_type] = {}
     for rule_1, rule_2 in combinations_with_replacement(connectomes.keys(), 2):
@@ -82,17 +100,25 @@ colors = {
     'ER-ER': '#332288',
     'ER-one_cluster': '#88CCEE',
     'ER-two_clusters': '#44AA99',
-    'one_cluster-one_cluster': '#117733',
-    'one_cluster-two_clusters': '#CC6677',
-    'two_clusters-two_clusters': '#882255',
+    'ER-one_cluster_shuffled': '#117733',
+    'one_cluster-one_cluster': '#999933',
+    'one_cluster-two_clusters': '#DDCC77',
+    'one_cluster-one_cluster_shuffled': '#EE8866',
+    'two_clusters-two_clusters': '#CC6677',
+    'two_clusters-one_cluster_shuffled': '#882255',
+    'one_cluster_shuffled-one_cluster_shuffled': '#AA4499',
 }
 labels = {
     'ER-ER': 'ER - ER',
     'ER-one_cluster': 'ER - one cluster',
     'ER-two_clusters': 'ER - two clusters',
+    'ER-one_cluster_shuffled': 'ER - one cluster shuffled',
     'one_cluster-one_cluster': 'one cluster - one cluster',
     'one_cluster-two_clusters': 'one cluster - two clusters',
+    'one_cluster-one_cluster_shuffled': 'one cluster - one cluster shuffled',
     'two_clusters-two_clusters': 'two clusters - two clusters',
+    'two_clusters-one_cluster_shuffled': 'two clusters - one cluster shuffled',
+    'one_cluster_shuffled-one_cluster_shuffled': 'one cluster shuffled - one cluster shuffled',
 }
 
 for connectome_type, connectomes in connectome_dict.items():
