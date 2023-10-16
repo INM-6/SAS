@@ -1,11 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+from matplotlib.gridspec import GridSpec
 import seaborn as sns
 import matplotlib as mpl
 from itertools import combinations_with_replacement
+from itertools import product
 from singular_angles import SingularAngles
 import os
 import networkx as nx
+import random
 
 
 # set fonttype so Avenir can be used with pdf format
