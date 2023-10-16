@@ -26,8 +26,10 @@ def plot_vectors(vectors, color, ax=None):
 
 
 # --- define matrices and unit vectors ---
-matrix_a = np.array([[1, 1], [0.1, 1]])
-matrix_b = np.array([[1.2, 0.8], [0.3, 1.3]])
+matrix_a = np.array([[-1, 1], [0.1, 1]])
+matrix_b = np.array([[-1.2, 0.8], [0.3, 1.3]])
+
+
 
 e0 = np.array([1, 0])
 e1 = np.array([0, 1])
@@ -48,44 +50,50 @@ S_a = np.diag(S_a)
 S_b = np.diag(S_b)
 
 # --- V transformation ---
-vectors_a_V_e = [np.dot(V_at, e0), np.dot(V_at, e1)]
-vectors_b_V_e = [np.dot(V_bt, e0), np.dot(V_bt, e1)]
+vectors_a_V_e = [np.dot(V_at.T, e0), np.dot(V_at.T, e1)]
+vectors_b_V_e = [np.dot(V_bt.T, e0), np.dot(V_bt.T, e1)]
+vectors_a_Vt_e = [np.dot(V_at, e0), np.dot(V_at, e1)]
+vectors_b_Vt_e = [np.dot(V_bt, e0), np.dot(V_bt, e1)]
 ax = plot_vectors(vectors_a_V_e, color='#004488')
 ax = plot_vectors(vectors_b_V_e, color='#BB5566', ax=ax)
-ax.set_title(r'$V^{T} \vec{e}$')
+ax.set_title(r'$V \vec{e}$')
 plt.savefig('plots/erklaerbaer/Ve.pdf', bbox_inches='tight')
+ax = plot_vectors(vectors_a_Vt_e, color='#004488')
+ax = plot_vectors(vectors_b_Vt_e, color='#BB5566', ax=ax)
+ax.set_title(r'$V^{T} \vec{e}$')
+plt.savefig('plots/erklaerbaer/Vt_e.pdf', bbox_inches='tight')
 
 # --- S transformation ---
 vectors_a_S_e = [np.dot(S_a, e0), np.dot(S_a, e1)]
 vectors_b_S_e = [np.dot(S_b, e0), np.dot(S_b, e1)]
-vectors_a_S_V_e = [np.dot(S_a, vectors_a_V_e[0]), np.dot(S_a, vectors_a_V_e[1])]
-vectors_b_S_V_e = [np.dot(S_b, vectors_b_V_e[0]), np.dot(S_b, vectors_b_V_e[1])]
+vectors_a_S_Vt_e = [np.dot(S_a, vectors_a_Vt_e[0]), np.dot(S_a, vectors_a_Vt_e[1])]
+vectors_b_S_Vt_e = [np.dot(S_b, vectors_b_Vt_e[0]), np.dot(S_b, vectors_b_Vt_e[1])]
 ax = plot_vectors(vectors_a_S_e, color='#004488')
 ax = plot_vectors(vectors_b_S_e, color='#BB5566', ax=ax)
 ax.set_title(r'$\Sigma \vec{e}$')
-plt.savefig('plots/erklaerbaer/Se.pdf', bbox_inches='tight')
-ax = plot_vectors(vectors_a_S_V_e, color='#004488')
-ax = plot_vectors(vectors_b_S_V_e, color='#BB5566', ax=ax)
+plt.savefig('plots/erklaerbaer/S_e.pdf', bbox_inches='tight')
+ax = plot_vectors(vectors_a_S_Vt_e, color='#004488')
+ax = plot_vectors(vectors_b_S_Vt_e, color='#BB5566', ax=ax)
 ax.set_title(r'$\Sigma V^{T} \vec{e}$')
-plt.savefig('plots/erklaerbaer/SVe.pdf', bbox_inches='tight')
+plt.savefig('plots/erklaerbaer/S_Vt_e.pdf', bbox_inches='tight')
 
 # --- U transformation ---
 vectors_a_U_e = [np.dot(U_a, e0), np.dot(U_a, e1)]
 vectors_b_U_e = [np.dot(U_b, e0), np.dot(U_b, e1)]
-vectors_a_U_S_V_e = [np.dot(U_a, vectors_a_S_V_e[0]), np.dot(U_a, vectors_a_S_V_e[1])]
-vectors_b_U_S_V_e = [np.dot(U_b, vectors_b_S_V_e[0]), np.dot(U_b, vectors_b_S_V_e[1])]
+vectors_a_U_S_Vt_e = [np.dot(U_a, vectors_a_S_Vt_e[0]), np.dot(U_a, vectors_a_S_Vt_e[1])]
+vectors_b_U_S_Vt_e = [np.dot(U_b, vectors_b_S_Vt_e[0]), np.dot(U_b, vectors_b_S_Vt_e[1])]
 ax = plot_vectors(vectors_a_U_e, color='#004488')
 ax = plot_vectors(vectors_b_U_e, color='#BB5566', ax=ax)
 ax.set_title(r'$U \vec{e}$')
-plt.savefig('plots/erklaerbaer/Ue.pdf', bbox_inches='tight')
-ax = plot_vectors(vectors_a_U_S_V_e, color='#004488')
-ax = plot_vectors(vectors_b_U_S_V_e, color='#BB5566', ax=ax)
+plt.savefig('plots/erklaerbaer/U_e.pdf', bbox_inches='tight')
+ax = plot_vectors(vectors_a_U_S_Vt_e, color='#004488')
+ax = plot_vectors(vectors_b_U_S_Vt_e, color='#BB5566', ax=ax)
 ax.set_title(r'$U \Sigma V^{T} \vec{e}$')
-plt.savefig('plots/erklaerbaer/USVe.pdf', bbox_inches='tight')
+plt.savefig('plots/erklaerbaer/U_S_Vt_e.pdf', bbox_inches='tight')
 ax = plot_vectors(vectors_a_M_e, color='#004488')
 ax = plot_vectors(vectors_b_M_e, color='#BB5566', ax=ax)
 ax.set_title(r'$M \vec{e}$')
-plt.savefig('plots/erklaerbaer/Me.pdf', bbox_inches='tight')
+plt.savefig('plots/erklaerbaer/M_e.pdf', bbox_inches='tight')
 
 
 # angles_noflip = (singular_angles.angle(U_a, U_b, method='columns')
