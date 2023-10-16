@@ -101,6 +101,9 @@ class SingularAngles():
         magnitude_b = np.linalg.norm(b, axis=axis)
         angle = np.arccos(dot_product / (magnitude_a * magnitude_b))
 
+        mask = np.isnan(angle) & np.isclose(dot_product, 1)
+        angle[mask] = 0
+
         return angle
 
     def similarity(self, matrix_a, matrix_b, repetitions=100, repeat_a=False, repeat_b=False):
@@ -178,7 +181,7 @@ class SingularAngles():
             return np.sqrt(((n - 1.) * s ** 2 + (nn - 1.) * sn ** 2) / (n + nn - 2.))
         return abs(np.mean(dist_a) - np.mean(dist_b)) / s_pooled(dist_a, dist_b)
 
-    def plot_similarities(self, similarity_scores, colors, labels, ax):
+    def plot_similarities(self, similarity_scores, colors, labels, ax, legend=True):
         """
         Plots the histogram of similarity scores for each key in the similarity_scores dictionary.
         The color and label for each key's histogram is provided by the colors and labels dictionaries.
@@ -201,7 +204,8 @@ class SingularAngles():
         """
         for key, score in similarity_scores.items():
             sns.histplot(score, stat='probability', linewidth=0, color=colors[key], label=labels[key])
-        ax.legend()
+        if legend:
+            ax.legend()
         ax.set_xlabel('similarity score')
         ax.set_ylabel('relative occurrence')
         return ax
