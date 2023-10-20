@@ -67,6 +67,12 @@ class SingularAngles():
         angles_flip = np.pi - angles_noflip
         angles = np.minimum(angles_noflip, angles_flip)
         weights = (S_a + S_b) / 2
+
+        # if one singular vector projects to 0, discard it
+        zero_mask = (S_a > np.finfo(float).eps) | (S_b > np.finfo(float).eps)
+        weights = weights[zero_mask]
+        angles = angles[zero_mask]
+
         weights /= np.sum(weights)
         smallness = 1 - angles / (np.pi / 2)
         weighted_smallness = smallness * weights
