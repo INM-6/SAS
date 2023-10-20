@@ -203,9 +203,15 @@ class SingularAngles():
             The axes object with the plotted histogram.
         """
         for key, score in similarity_scores.items():
-            sns.histplot(score, stat='probability', linewidth=0, color=colors[key], label=labels[key])
+            if ('ER' in key) and (key != 'ER-ER'):
+                ax.hist(score, density=True, color=colors[key], label=labels[key],
+                        edgecolor='#332288', linewidth=1.5, histtype="stepfilled")
+            else:
+                ax.hist(score, density=True, color=colors[key], label=labels[key], linewidth=0,
+                        histtype="stepfilled")
+
         if legend:
             ax.legend()
         ax.set_xlabel('similarity score')
-        ax.set_ylabel('relative occurrence')
+        ax.set_ylabel('probability density')
         return ax

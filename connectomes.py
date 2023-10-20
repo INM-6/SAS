@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.gridspec import GridSpec
+import matplotlib.colors as mcolors
 import seaborn as sns
 import matplotlib as mpl
 from itertools import combinations_with_replacement
@@ -62,15 +63,16 @@ def watts_strogatz(size, mean_connection_prob, p=0.3):
     graph = nx.watts_strogatz_graph(size[0], k=int(mean_connection_prob * (size[1] - 1)), p=p)
     return nx.to_numpy_array(graph)
 
+
 def barabasi_albert(size, mean_connection_prob):
     graph = nx.barabasi_albert_graph(size[0], m=int(mean_connection_prob * (size[1] - 1) / 2))
     return nx.to_numpy_array(graph)
 
 
-def plot_connectome(connectome, name, title, fig=None, ax=None, save=True):
+def plot_connectome(connectome, name, title, fig=None, ax=None, save=True, cmap='Greens'):
     if (fig is None) and (ax is None):
         fig, ax = plt.subplots()
-    im = ax.imshow(connectome, cmap='Greens', vmin=0, vmax=np.max(connectome))
+    im = ax.imshow(connectome, cmap=cmap, vmin=0, vmax=np.max(connectome))
     cbar = fig.colorbar(im, ax=ax)
     ax.set_xlabel('pre-synaptic neuron')
     ax.set_ylabel('post-synaptic neuron')
@@ -98,8 +100,8 @@ connectomes_square['one_cluster'] = clustered_connectome(size_square, clusters=[
 connectomes_square['two_clusters'] = clustered_connectome(size_square, clusters=[(50, 100), (100, 120)],
                                                           rel_cluster_weights=[50, 50],
                                                           mean_connection_prob=mean_connection_prob)
-connectomes_square['watts_strogatz'] = watts_strogatz(size_square, mean_connection_prob, p=0.3)
-connectomes_square['barabasi_albert'] = barabasi_albert(size_square, mean_connection_prob)
+connectomes_square['WS'] = watts_strogatz(size_square, mean_connection_prob, p=0.3)
+connectomes_square['BA'] = barabasi_albert(size_square, mean_connection_prob)
 
 connectomes_rectangular = {}
 connectomes_rectangular['ER'] = erdos_renyi_connectome(size_rectangular, mean_connection_prob)
@@ -130,8 +132,8 @@ titles = {
     'two_clusters': 'Two clusters',
     'one_cluster_shuffled': 'One cluster - shuffled',
     'two_clusters_shuffled': 'Two clusters - shuffled',
-    'watts_strogatz': 'Watts-Strogatz',
-    'barabasi_albert': 'Barabasi-Albert',
+    'WS': 'Watts-Strogatz',
+    'BA': 'Barabasi-Albert',
 }
 
 # score_name = 'scores'
@@ -144,21 +146,6 @@ except FileNotFoundError:
     print('Scores not found on disk. Calculating...')
     scores = {}
     for connectome_type, connectomes in connectome_dict.items():
-        for name, connectome in connectomes.items():
-            plot_connectome(connectome=singular_angles.draw(connectome, repetitions=1)
-                            [0], name=connectome_type + '_' + name, title=titles[name])
-
-        # plot all connectomes
-        fig, axes = plt.subplots(1, 6, figsize=(30, 5))
-        index = 0
-        for name, connectome in connectomes.items():
-            if 'shuffle' not in name:
-                ax = plot_connectome(connectome=singular_angles.draw(connectome, repetitions=1)
-                                     [0], name=connectome_type + '_' + name, title=titles[name], fig=fig,
-                                     ax=axes[index], save=False)
-                index += 1
-        plt.savefig(f'plots/connectomes_{connectome_type}.pdf')
-
         scores[connectome_type] = {}
         for rule_1, rule_2 in combinations_with_replacement(connectomes.keys(), 2):
             score = singular_angles.similarity(connectomes[rule_1], connectomes[rule_2])
@@ -169,28 +156,53 @@ except FileNotFoundError:
 
 # ------- PLOT SIMILARITY SCORES FOR CONNECTOMES -------
 
-colors_ER_DCM = {
-    'DCM-DCM': '#332288',
-    'ER-DCM': '#88CCEE',
-    'ER-ER': '#44AA99',
+def colormap(base_color):
+    cmap = mcolors.LinearSegmentedColormap.from_list(
+        'custom_colormap', ['#FFFFFF', base_color])
+    return cmap
+
+def plot_legend(ax, hs, ls):
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.tick_params(axis='both', which='both', length=0)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.legend(hs, ls, frameon=False, loc=(0.1, 0.1), ncol=1)
+
+colors = {
+    'ER': '#332288',
+    'DCM': '#88CCEE',
+    'one_cluster': '#44AA99',
+    'one_cluster_shuffled': '#999933',
+    'two_clusters': '#CC6677',
+    'WS': '#DDCC77',
+    'BA': '#EE8866',
 }
-labels_ER_DCM = {
+
+colors_comparisons = {
+    'DCM-DCM': '#88CCEE',
+    'ER-ER': '#332288',
+    'one_cluster-one_cluster': '#44AA99',
+    'two_clusters-two_clusters': '#CC6677',
+    'one_cluster_shuffled-one_cluster_shuffled': '#5AAE61',
+    'WS-WS': '#DDCC77',
+    'BA-BA': '#EE8866',
+    'ER-DCM': '#88CCEE',
+    'ER-one_cluster': '#44AA99',
+    'ER-two_clusters': '#CC6677',
+    'one_cluster-two_clusters': '#000000',
+    'one_cluster-one_cluster_shuffled': '#D9F0D3',
+    'ER-WS': '#DDCC77',
+    'ER-BA': '#EE8866',
+    'one_cluster-BA': '#44AA99',
+}
+
+labels = {
     'ER-ER': 'ER - ER',
     'ER-DCM': 'DCM - ER',
     'DCM-DCM': 'DCM - DCM',
-}
-
-colors = {
-    'ER-ER': '#44AA99',
-    'ER-one_cluster': '#117733',
-    'ER-two_clusters': '#999933',
-    'one_cluster-one_cluster': '#DDCC77',
-    'one_cluster-two_clusters': '#EE8866',
-    'one_cluster-one_cluster_shuffled': '#CC6677',
-    'two_clusters-two_clusters': '#882255',
-    'one_cluster_shuffled-one_cluster_shuffled': '#AA4499',
-}
-labels = {
     'ER-ER': 'ER - ER',
     'ER-one_cluster': 'ER - one cluster',
     'ER-two_clusters': 'ER - two clusters',
@@ -199,58 +211,101 @@ labels = {
     'one_cluster-one_cluster_shuffled': 'one cluster -\none cluster shuffled',
     'two_clusters-two_clusters': 'two clusters - two clusters',
     'one_cluster_shuffled-one_cluster_shuffled': 'one cluster shuffled -\none cluster shuffled',
+    'ER-WS': 'ER - WS',
+    'WS-WS': 'WS - WS',
+    'ER-BA': 'ER - BA',
+    'BA-BA': 'BA - BA',
+    'one_cluster-BA': 'One cluster - BA',
 }
 
-# sqare matrix comparison of ER and DCM
-comparisons = ['DCM-DCM', 'ER-DCM', 'ER-ER']
-fig = plt.figure(tight_layout=True, figsize=(15, 5))
-gs = GridSpec(1, 10,
-              wspace=0.2,
-              left=0.01,
-              right=0.99,
-              hspace=0.4)
-ax = fig.add_subplot(gs[:, 1:4])
-ax = singular_angles.plot_similarities(
-    similarity_scores={key: scores['square'][key] for key in comparisons},
-    colors=colors_ER_DCM, labels=labels_ER_DCM, ax=ax, legend=False)
-ax.text(-0.1, 1.1, 'A', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+def plot_connectome_similarity(connectomes, savename):
 
-hs, ls = ax.get_legend_handles_labels()
+    mosaic = """
+        AAABBB.CCCCX
+        AAABBB.CCCCX
+        AAABBB.CCCCX
+        DDDEEE.FFFFY
+        DDDEEE.FFFFY
+        DDDEEE.FFFFY
+        GGGHHH.IIIIZ
+        GGGHHH.IIIIZ
+        GGGHHH.IIIIZ
+        """
+    fig = plt.figure(figsize=(15, 10), layout="constrained", dpi=1200)
+    ax_dict = fig.subplot_mosaic(mosaic)
 
-for key in [key for key in scores['square'].keys() if 'DCM' in key]:
-    del scores['square'][key]
-del scores['square']['ER-one_cluster_shuffled']
-del scores['square']['two_clusters-one_cluster_shuffled']
-del scores['rectangular']['ER-one_cluster_shuffled']
-del scores['rectangular']['two_clusters-one_cluster_shuffled']
+    # --- PLOT CONNECTOMES ---
 
-# all other comparisons
-# square
-ax = fig.add_subplot(gs[:, 5:8])
-ax = singular_angles.plot_similarities(similarity_scores=scores['square'], colors=colors,
-                                       labels=labels, ax=ax, legend=False)
-ax.text(-0.1, 1.1, 'B', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
-h, l = ax.get_legend_handles_labels()
-hs += h[1:]
-ls += l[1:]
-ax = fig.add_subplot(gs[:, 8:10])
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
-ax.spines['bottom'].set_visible(False)
-ax.spines['left'].set_visible(False)
-ax.tick_params(axis='both', which='both', length=0)
-ax.set_xticks([])
-ax.set_yticks([])
-ax.legend(hs, ls, frameon=False, loc=(0.1, 0.1), ncol=1)
-plt.savefig(f'plots/similarity_scores.png', dpi=600)
+    ax = ax_dict['A']
+    ax = plot_connectome(connectome=singular_angles.draw(connectomes['ER'], repetitions=1)[0],
+                         name='square_ER', title=titles['ER'], fig=fig, ax=ax, save=False,
+                         cmap=colormap(colors['ER']))
+    ax.text(-0.1, 1.1, 'A', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
-# rectangular
-fig, ax = plt.subplots()
-ax = singular_angles.plot_similarities(similarity_scores=scores['rectangular'], colors=colors,
-                                       labels=labels, ax=ax, legend=True)
-ax.set_title('rectangular')
-h, l = ax.get_legend_handles_labels()
-plt.savefig('plots/similarity_scores_rectangular.png', dpi=600)
+    ax = ax_dict['B']
+    ax = plot_connectome(connectome=singular_angles.draw(connectomes['DCM'], repetitions=1)[0],
+                         name='square_DCM', title=titles['DCM'], fig=fig, ax=ax, save=False,
+                         cmap=colormap(colors['DCM']))
+    ax.text(-0.1, 1.1, 'B', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+
+    ax = ax_dict['D']
+    ax = plot_connectome(connectome=singular_angles.draw(connectomes['one_cluster'], repetitions=1)[0],
+                         name='square_one_cluster', title=titles['one_cluster'], fig=fig, ax=ax, save=False,
+                         cmap=colormap(colors['one_cluster']))
+    ax.text(-0.1, 1.1, 'D', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+
+    ax = ax_dict['E']
+    ax = plot_connectome(connectome=singular_angles.draw(connectomes['two_clusters'], repetitions=1)[0],
+                         name='square_two_clusters', title=titles['two_clusters'], fig=fig, ax=ax, save=False,
+                         cmap=colormap(colors['two_clusters']))
+    ax.text(-0.1, 1.1, 'E', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+
+    ax = ax_dict['G']
+    ax = plot_connectome(connectome=singular_angles.draw(connectomes['WS'], repetitions=1)[0],
+                         name='square_WS', title=titles['WS'], fig=fig, ax=ax, save=False,
+                         cmap=colormap(colors['WS']))
+    ax.text(-0.1, 1.1, 'G', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+
+    ax = ax_dict['H']
+    ax = plot_connectome(connectome=singular_angles.draw(connectomes['BA'], repetitions=1)[0],
+                         name='square_BA', title=titles['BA'], fig=fig, ax=ax, save=False,
+                         cmap=colormap(colors['BA']))
+    ax.text(-0.1, 1.1, 'H', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+
+    ax = ax_dict['C']
+    comparisons = ['ER-ER', 'DCM-DCM', 'ER-DCM']
+    ax = singular_angles.plot_similarities(
+        similarity_scores={key: scores['square'][key] for key in comparisons},
+        colors=colors_comparisons, labels={c: labels[c] for c in comparisons}, ax=ax, legend=False)
+    ax.text(-0.1, 1.1, 'C', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    hs, ls = ax.get_legend_handles_labels()
+    plot_legend(ax_dict['X'], hs, ls)
+
+    ax = ax_dict['F']
+    comparisons = [
+        'one_cluster-one_cluster', 'ER-one_cluster', 'two_clusters-two_clusters', 'ER-two_clusters',
+        'one_cluster-two_clusters']#, 'one_cluster_shuffled-one_cluster_shuffled', 'one_cluster-one_cluster_shuffled']
+    ax = singular_angles.plot_similarities(
+        similarity_scores={key: scores['square'][key] for key in comparisons},
+        colors=colors_comparisons, labels={c: labels[c] for c in comparisons}, ax=ax, legend=False)
+    ax.text(-0.1, 1.1, 'F', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    hs, ls = ax.get_legend_handles_labels()
+    plot_legend(ax_dict['Y'], hs, ls)
+
+    ax = ax_dict['I']
+    comparisons = [
+        'WS-WS', 'BA-BA', 'ER-WS', 'ER-BA', 'one_cluster-BA']
+    ax = singular_angles.plot_similarities(
+        similarity_scores={key: scores['square'][key] for key in comparisons},
+        colors=colors_comparisons, labels={c: labels[c] for c in comparisons}, ax=ax, legend=False)
+    ax.text(-0.1, 1.1, 'I', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    hs, ls = ax.get_legend_handles_labels()
+    plot_legend(ax_dict['Z'], hs, ls)
+
+    plt.savefig(f'plots/connectomes_and_similarity_{savename}.pdf')
+
+plot_connectome_similarity(connectomes_square, 'square')
+# plot_connectome_similarity(connectomes_rectangular, 'rectangular')
 
 # --- CALCULATE SIMILARITY FOR INCREASINGLY DIFFERENT MATRICES
 
