@@ -1,16 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from matplotlib.gridspec import GridSpec
 import matplotlib.colors as mcolors
 import seaborn as sns
 import matplotlib as mpl
-from itertools import combinations_with_replacement
-from itertools import product
+from itertools import product, combinations, combinations_with_replacement
 from singular_angles import SingularAngles
 import os
 import networkx as nx
 import random
+from scipy import stats
+import xarray as xr
 
 
 # set fonttype so Avenir can be used with pdf format
@@ -39,11 +39,17 @@ def erdos_renyi_connectome(size, mean_connection_prob):
 
 
 def directed_configuration_model(size, mean_connection_prob, np_seed=1):
-    np.random.seed(np_seed)
-    total_connections = mean_connection_prob * size[0] * size[1]
-    indegrees = np.random.randint(low=0, high=total_connections + 1, size=size[0])
-    indegrees = np.round(indegrees / np.sum(indegrees) * total_connections).astype(int)
-    outdegrees = np.random.permutation(indegrees)
+
+    def calc_degrees(length, total_connections, np_seed):
+        np.random.seed(np_seed)
+        connections = np.ones(total_connections)
+        degrees = np.zeros(length)
+        np.add.at(degrees, np.random.choice(range(length), total_connections, replace=True), connections)
+        return degrees.astype(int)
+
+    total_connections = int(mean_connection_prob * size[0] * size[1])
+    indegrees = calc_degrees(size[1], total_connections, np_seed)
+    outdegrees = calc_degrees(size[0], total_connections, np_seed + 1)
 
     graph = nx.directed_configuration_model(in_degree_sequence=indegrees, out_degree_sequence=outdegrees)
     graph.remove_edges_from(nx.selfloop_edges(graph))
