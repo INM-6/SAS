@@ -132,7 +132,7 @@ singular_angles = SingularAngles()
 os.makedirs('plots', exist_ok=True)
 # compare all connectomes with each other
 titles = {
-    'ER': 'Erdős-Renyi',
+    'ER': 'Erdős-Rényi',
     'DCM': 'Directed configuration model',
     'one_cluster': 'One cluster',
     'two_clusters': 'Two clusters',
@@ -142,8 +142,7 @@ titles = {
     'BA': 'Barabasi-Albert',
 }
 
-# score_name = 'scores'
-score_name = 'scores_all'
+score_name = 'scores'
 
 try:
     scores = np.load(f'{score_name}.npy', allow_pickle=True).item()
