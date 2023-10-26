@@ -2,6 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.colors as mcolors
+from matplotlib import cm
+from matplotlib.colors import ListedColormap
+from matplotlib.colors import TwoSlopeNorm
 import seaborn as sns
 import matplotlib as mpl
 from itertools import product, combinations, combinations_with_replacement
@@ -159,12 +162,36 @@ except FileNotFoundError:
                   f"{np.round(np.std(score), 2)}")
     np.save(f'{score_name}.npy', scores)
 
+# calculate p values between distributions
+_, p_values = stats.ttest_ind(scores['square']['ER-ER'], scores['square']['ER-BA'], equal_var=False)
+
+comparisons = ['ER-ER', 'DCM-DCM', 'ER-DCM', 'one_cluster-one_cluster', 'ER-one_cluster',
+               'two_clusters-two_clusters', 'ER-two_clusters', 'one_cluster-two_clusters', 'WS-WS', 'BA-BA', 'ER-WS',
+               'ER-BA', 'one_cluster-BA']
+dummy_data_array = np.zeros((len(comparisons), len(comparisons)))
+p_values = xr.DataArray(
+    dummy_data_array,
+    coords={'comparison_0': comparisons, 'comparison_1': comparisons},
+    dims=['comparison_0', 'comparison_1'])
+
+for meta_comparisons in combinations(comparisons, 2):
+    _, p_value = stats.ttest_ind(
+        scores['square'][meta_comparisons[0]], scores['square'][meta_comparisons[1]], equal_var=False)
+    p_values.loc[meta_comparisons[0], meta_comparisons[1]] = p_value
+
+p_values = np.asarray(p_values)
+# set values of true 0 to np.nan such that they are not plotted later on
+p_values[np.isclose(p_values, 0, atol=1e-300)] = np.nan
+
+
 # ------- PLOT SIMILARITY SCORES FOR CONNECTOMES -------
+
 
 def colormap(base_color):
     cmap = mcolors.LinearSegmentedColormap.from_list(
         'custom_colormap', ['#FFFFFF', base_color])
     return cmap
+
 
 def plot_legend(ax, hs, ls):
     ax.spines['top'].set_visible(False)
@@ -175,6 +202,7 @@ def plot_legend(ax, hs, ls):
     ax.set_xticks([])
     ax.set_yticks([])
     ax.legend(hs, ls, frameon=False, loc=(0.1, 0.1), ncol=1)
+
 
 colors = {
     'ER': '#332288',
@@ -222,6 +250,7 @@ labels = {
     'BA-BA': 'BA - BA',
     'one_cluster-BA': 'One cluster - BA',
 }
+
 
 def plot_connectome_similarity(connectomes, savename):
 
@@ -309,7 +338,85 @@ def plot_connectome_similarity(connectomes, savename):
 
     plt.savefig(f'plots/connectomes_and_similarity_{savename}.pdf')
 
+def plot_p_values(p_values, savename='p_values'):
+
+    # plot p values
+    # Define colormap for p-values
+    top = cm.get_cmap('Blues', 1000)
+    bottom = cm.get_cmap('Reds', 1000)
+    newcolors = np.vstack((top(np.linspace(0.95, 0.6, 1000)),
+                           bottom(np.linspace(0.45, 0.9, 1000))))
+    newcmp = ListedColormap(newcolors)
+    sig = 0.05 / (len(comparisons) * (len(comparisons) - 1)) / 2
+    sig_alpha = np.log10(sig)
+    newnorm = TwoSlopeNorm(vmin=-50, vcenter=sig_alpha, vmax=0)
+    n = len(comparisons)
+
+    mosaic = """
+        AAAAAAAAAAAAAA..
+        AAAAAAAAAAAAAA.B
+        AAAAAAAAAAAAAA.B
+        AAAAAAAAAAAAAA.B
+        AAAAAAAAAAAAAA.B
+        AAAAAAAAAAAAAA.B
+        AAAAAAAAAAAAAA.B
+        AAAAAAAAAAAAAA.B
+        AAAAAAAAAAAAAA.B
+        AAAAAAAAAAAAAA.B
+        AAAAAAAAAAAAAA.B
+        AAAAAAAAAAAAAA.B
+        AAAAAAAAAAAAAA.B
+        """
+    fig = plt.figure(figsize=(10, 9), layout="constrained")
+    ax_dict = fig.subplot_mosaic(mosaic)
+
+    # Plot color mesh
+    ax = ax_dict['A']
+    pval_mesh = ax.pcolormesh(np.log10(p_values.T), cmap=newcmp, norm=newnorm)
+    # Add text
+    for x in range(n):
+        for y in range(n):
+            try:
+                if np.log10(p_values[x, y]) > -1:
+                    ax.text(x + 0.5, y + 0.5, s=f'{np.round(np.log10(p_values[x, y]), 2)}', va='center', ha='center', color='white', fontsize=10)
+                else:
+                    ax.text(x + 0.5, y + 0.5, s=f'{int(np.log10(p_values[x, y]))}', va='center', ha='center', color='white', fontsize=10)
+            except OverflowError:
+                pass
+            except ValueError:
+                pass
+    # Add white lines around each entry
+    ax.set_xticks(np.arange(0, n + 1, step=0.5), minor=True)
+    ax.set_yticks(np.arange(0, n + 1, step=0.5), minor=True)
+    ax.grid(which='minor', color='white', linestyle='-', linewidth=0.5)
+    ax.tick_params(which="minor", bottom=False, left=False)
+    # Format ticks
+    ax.set_xticks(np.arange(0.5, n - 1))
+    ax.set_xticklabels([])
+    ax.set_yticks(np.arange(1.5, n))
+    ax.set_yticklabels([])
+    ax.set_xticklabels([labels[c] for c in comparisons][:-1], rotation=45, ha='right', va='top')
+    ax.set_yticklabels([labels[c] for c in comparisons][1:])
+    ax.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
+    ax.set_xlim(0, n)
+    ax.set_ylim(n, 0)
+
+    # Inset for the colorbar
+    cb = mpl.colorbar.ColorbarBase(ax_dict['B'], cmap=newcmp,
+                                   norm=newnorm,
+                                   boundaries=np.arange(-51, 0, step=0.1),
+                                   # orientation='vertical',
+                                   ticks=[-50, -40, -30, -20, -10, sig_alpha, 0])
+    for t in cb.ax.get_xticklabels():
+        t.set_fontsize(6)
+    cb.ax.set_xlabel('log of p-value')
+    # cb.ax.set_xlim(-21, -0.1)
+
+    plt.savefig(f'plots/{savename}.pdf')
+
 plot_connectome_similarity(connectomes_square, 'square')
+plot_p_values(p_values)
+
 # plot_connectome_similarity(connectomes_rectangular, 'rectangular')
 
 # --- CALCULATE SIMILARITY FOR INCREASINGLY DIFFERENT MATRICES
