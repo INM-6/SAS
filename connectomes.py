@@ -184,7 +184,7 @@ p_values = np.asarray(p_values)
 p_values[np.isclose(p_values, 0, atol=1e-300)] = np.nan
 
 
-# ------- PLOT SIMILARITY SCORES FOR CONNECTOMES -------
+# ------- PLOT SIMILARITY SCORES AND P VALUES FOR CONNECTOMES -------
 
 
 def colormap(base_color):
@@ -338,6 +338,7 @@ def plot_connectome_similarity(connectomes, savename):
 
     plt.savefig(f'plots/connectomes_and_similarity_{savename}.pdf')
 
+
 def plot_p_values(p_values, savename='p_values'):
 
     # plot p values
@@ -378,9 +379,11 @@ def plot_p_values(p_values, savename='p_values'):
         for y in range(n):
             try:
                 if np.log10(p_values[x, y]) > -1:
-                    ax.text(x + 0.5, y + 0.5, s=f'{np.round(np.log10(p_values[x, y]), 2)}', va='center', ha='center', color='white', fontsize=10)
+                    ax.text(
+                        x + 0.5, y + 0.5, s=f'{np.round(np.log10(p_values[x, y]), 2)}', va='center', ha='center', color='white', fontsize=10)
                 else:
-                    ax.text(x + 0.5, y + 0.5, s=f'{int(np.log10(p_values[x, y]))}', va='center', ha='center', color='white', fontsize=10)
+                    ax.text(x + 0.5, y + 0.5, s=f'{int(np.log10(p_values[x, y]))}',
+                            va='center', ha='center', color='white', fontsize=10)
             except OverflowError:
                 pass
             except ValueError:
@@ -414,8 +417,8 @@ def plot_p_values(p_values, savename='p_values'):
 
     plt.savefig(f'plots/{savename}.pdf')
 
-plot_connectome_similarity(connectomes_square, 'square')
-plot_p_values(p_values)
+# plot_connectome_similarity(connectomes_square, 'square')
+# plot_p_values(p_values)
 
 # plot_connectome_similarity(connectomes_rectangular, 'rectangular')
 
@@ -431,13 +434,13 @@ def change_matrix(base_matrix_template, max_change_fraction=0.1, step_size=0.01,
     changes = []
     similarity_mean = []
     similarity_std = []
-    for change in np.arange(max_changes + 1, step=size * step_size):
+    for change in np.arange(max_changes + 1, step=size * step_size).astype(int):
         similarity = []
         for rep in range(repetitions):
             changed_matrix = base_matrix.copy()
             indices = list(product(np.arange(np.shape(changed_matrix)[0]), np.arange(np.shape(changed_matrix)[1])))
-            samples = random.sample(indices, change)
             if change > 0:
+                samples = random.sample(indices, change)
                 for coordinate in samples:
                     if changed_matrix[coordinate] == 0:
                         changed_matrix[coordinate] += 1
@@ -455,11 +458,13 @@ def change_matrix(base_matrix_template, max_change_fraction=0.1, step_size=0.01,
     return similarity_mean, similarity_std, changes, base_matrix
 
 
-sizes = [(300, 300), (200, 450), (100, 900), (50, 1800)]
-connectome_types = ['DCM', 'ER', 'one_cluster', 'two_clusters']
-percent_evals = [0.2, 0.4, 0.6, 0.8, 1.0]
+def calculate_dropoff(
+        sizes=[(300, 300), (200, 450), (100, 900), (50, 1800)],
+        connectome_types=['DCM', 'ER', 'one_cluster', 'two_clusters'],
+        percent_evals=[0.2, 0.4, 0.6, 0.8, 1.0],
+        savename='similarity_under_changes'):
 
-fig, axes = plt.subplots(1, len(sizes), figsize=(int(len(sizes) * 5), 5))
+    fig, axes = plt.subplots(1, len(sizes), figsize=(int(len(sizes) * 5), 5))
 
 for i, size in enumerate(sizes):
     for connectome_type in connectome_types:
@@ -482,16 +487,18 @@ for i, size in enumerate(sizes):
         ax.set_ylabel('similarity')
         # ax.set_ylim(0, 1)
         ax.set_xscale('log')
-        ax.set_yscale('log')
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        plt.savefig('plots/similarity_under_changes.png', dpi=600, bbox_inches='tight')
+            ax.set_yscale('log')
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            plt.savefig(f'plots/{savename}.png', dpi=600, bbox_inches='tight')
 
-    # similarity_matrix = np.empty((len(sizes), len(percent_evals)))
-    # for i, size in enumerate(sizes):
+        # similarity_matrix = np.empty((len(sizes), len(percent_evals)))
+        # for i, size in enumerate(sizes):
     #     results = change_matrix(connectomes_square[connectome_type])
     #     similarity_matrix[i] = results[0]
     #     changes = results[2]
 
-    # ax = axes[1]
-    # ax.
+        # ax = axes[1]
+        # ax.
+
+# calculate_dropoff()
