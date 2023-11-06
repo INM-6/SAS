@@ -159,7 +159,7 @@ except FileNotFoundError:
     scores = {}
     for connectome_type, connectomes in connectome_dict.items():
         scores[connectome_type] = {}
-        for rule_1, rule_2 in combinations_with_replacement(networks, 2):
+        for rule_1, rule_2 in combinations_with_replacement(connectomes.keys(), 2):
             score = singular_angles.similarity(connectomes[rule_1], connectomes[rule_2])
             scores[connectome_type][f'{rule_1}-{rule_2}'] = score
             print(f"The similarity of {rule_1} and {rule_2} is {np.round(np.mean(score), 2)} ± "
