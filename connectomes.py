@@ -67,17 +67,19 @@ def directed_configuration_model(size, mean_connection_prob, np_seed=1):
         edge = np.random.choice(graph.edges())
         graph.remove_edge(*edge)
 
-    return nx.to_numpy_array(graph)
+    return nx.to_numpy_array(graph).T[:size[0], :size[1]]
 
 
 def watts_strogatz(size, mean_connection_prob, p=0.3):
-    graph = nx.watts_strogatz_graph(size[0], k=int(mean_connection_prob * (size[1] - 1)), p=p)
-    return nx.to_numpy_array(graph)
+    graph = nx.watts_strogatz_graph(np.maximum(size[0], size[1]), k=int(
+        mean_connection_prob * (np.maximum(size[0], size[1]) - 1)), p=p)
+    return nx.to_numpy_array(graph).T[:size[0], :size[1]]
 
 
 def barabasi_albert(size, mean_connection_prob):
-    graph = nx.barabasi_albert_graph(size[0], m=int(mean_connection_prob * (size[1] - 1) / 2))
-    return nx.to_numpy_array(graph)
+    graph = nx.barabasi_albert_graph(np.maximum(size[0], size[1]), m=int(
+        mean_connection_prob * (np.maximum(size[0], size[1]) - 1) / 2))
+    return nx.to_numpy_array(graph).T[:size[0], :size[1]]
 
 
 def plot_connectome(connectome, name, title, fig=None, ax=None, save=True, cmap='Greens'):
@@ -95,7 +97,7 @@ def plot_connectome(connectome, name, title, fig=None, ax=None, save=True, cmap=
 
 
 size_square = (300, 300)
-size_rectangular = (200, 450)
+size_rectangular = (450, 200)
 mean_connection_prob = 0.1
 shuffle_ = True
 
@@ -116,12 +118,15 @@ connectomes_square['BA'] = barabasi_albert(size_square, mean_connection_prob)
 
 connectomes_rectangular = {}
 connectomes_rectangular['ER'] = erdos_renyi_connectome(size_rectangular, mean_connection_prob)
+connectomes_rectangular['DCM'] = directed_configuration_model(size_rectangular, mean_connection_prob)
 connectomes_rectangular['one_cluster'] = clustered_connectome(size_rectangular, clusters=[(0, 50)],
                                                               rel_cluster_weights=[100],
                                                               mean_connection_prob=mean_connection_prob)
 connectomes_rectangular['two_clusters'] = clustered_connectome(size_rectangular, clusters=[(50, 100), (100, 150)],
                                                                rel_cluster_weights=[20, 80],
                                                                mean_connection_prob=mean_connection_prob)
+connectomes_rectangular['WS'] = watts_strogatz(size_rectangular, mean_connection_prob, p=0.3)
+connectomes_rectangular['BA'] = barabasi_albert(size_rectangular, mean_connection_prob)
 
 if shuffle_:
     connectomes_square['one_cluster_shuffled'] = shuffle(connectomes_square['one_cluster'])
@@ -149,7 +154,7 @@ titles = {
     'BA': 'Barabasi-Albert',
 }
 
-score_name = 'scores'
+score_name = 'scores_'
 
 try:
     scores = np.load(f'{score_name}.npy', allow_pickle=True).item()
@@ -166,12 +171,12 @@ except FileNotFoundError:
                   f"{np.round(np.std(score), 2)}")
     np.save(f'{score_name}.npy', scores)
 
-# calculate p values between distributions
-_, p_values = stats.ttest_ind(scores['square']['ER-ER'], scores['square']['ER-BA'], equal_var=False)
 
-comparisons = []
-for i, network_i in enumerate(networks):
-    for j, network_j in enumerate(networks):
+def calc_p_values(connectome_type):
+    # calculate p values between distributions
+    comparisons = []
+    for i, network_i in enumerate(networks):
+        for j, network_j in enumerate(networks):
         if j >= i:
             comparisons.append(f'{network_i}-{network_j}')
 dummy_data_array = np.zeros((len(comparisons), len(comparisons)))
@@ -182,25 +187,28 @@ p_values = xr.DataArray(
 
 for meta_comparisons in combinations(comparisons, 2):
 
-    # if self-similarity is at position 1, swap positions
-    if (meta_comparisons[1].split('-')[0] == meta_comparisons[1].split('-')[1]):
-        if (meta_comparisons[0].split('-')[0] == meta_comparisons[0].split('-')[1]):
-            if networks.index(meta_comparisons[1].split('-')[0]) < networks.index(meta_comparisons[0].split('-')[0]):
+        # if self-similarity is at position 1, swap positions
+        if (meta_comparisons[1].split('-')[0] == meta_comparisons[1].split('-')[1]):
+            if (meta_comparisons[0].split('-')[0] == meta_comparisons[0].split('-')[1]):
+                if (networks.index(meta_comparisons[1].split('-')[0])
+                        < networks.index(meta_comparisons[0].split('-')[0])):
+                    meta_comparisons = tuple(reversed(meta_comparisons))
+            else:
                 meta_comparisons = tuple(reversed(meta_comparisons))
-        else:
-            meta_comparisons = tuple(reversed(meta_comparisons))
 
-    if ((meta_comparisons[0].split('-')[0] == meta_comparisons[0].split('-')[1])
-            and (meta_comparisons[0].split('-')[0] in meta_comparisons[1].split('-'))):
-        try:
-            _, p_value = stats.ttest_ind(
-                scores['square'][meta_comparisons[0]], scores['square'][meta_comparisons[1]], equal_var=False)
-        except KeyError:
-            _, p_value = stats.ttest_ind(
-                scores['square'][meta_comparisons[0]], scores['square'][meta_comparisons[1]], equal_var=False)
-        p_values.loc[meta_comparisons[0], meta_comparisons[1]] = p_value
+        if ((meta_comparisons[0].split('-')[0] == meta_comparisons[0].split('-')[1])
+                and (meta_comparisons[0].split('-')[0] in meta_comparisons[1].split('-'))):
+            try:
+                _, p_value = stats.ttest_ind(
+                    scores[connectome_type][meta_comparisons[0]], scores[connectome_type][meta_comparisons[1]],
+                    equal_var=False)
+            except KeyError:
+                _, p_value = stats.ttest_ind(
+                    scores[connectome_type][meta_comparisons[0]], scores[connectome_type][meta_comparisons[1]],
+                    equal_var=False)
+            p_values.loc[meta_comparisons[0], meta_comparisons[1]] = p_value
 
-p_values_arr = np.asarray(p_values)
+    return p_values
 
 
 # ------- PLOT SIMILARITY SCORES AND P VALUES FOR CONNECTOMES -------
@@ -234,24 +242,8 @@ colors = {
     'BA': '#EE8866',
 }
 
-colors_comparisons = {
-    'DCM-DCM': ('#88CCEE', '#88CCEE'),
-    'ER-ER': ('#332288', '#332288'),
-    'one_cluster-one_cluster': ('#44AA99', '#44AA99'),
-    'two_clusters-two_clusters': ('#CC6677', '#CC6677'),
-    'one_cluster_shuffled-one_cluster_shuffled': ('#5AAE61', '#5AAE61'),
-    'WS-WS': ('#DDCC77', '#DDCC77'),
-    'BA-BA': ('#EE8866', '#EE8866'),
-    'ER-DCM': ('#332288', '#88CCEE'),
-    'ER-one_cluster': ('#332288', '#44AA99'),
-    'ER-two_clusters': ('#332288', '#CC6677'),
-    'one_cluster-two_clusters': ('#44AA99', '#CC6677'),
-    'one_cluster-one_cluster_shuffled': ('#44AA99', '#D9F0D3'),
-    'two_clusters-two_clusters_shuffled': ('#CC6677', '#882255'),
-    'ER-WS': ('#332288', '#DDCC77'),
-    'ER-BA': ('#332288', '#EE8866'),
-    'one_cluster-BA': ('#44AA99', '#EE8866'),
-}
+colors_comparisons = {f'{net_0}-{net_1}': (colors[net_0], colors[net_1])
+                      for net_0, net_1 in combinations_with_replacement(networks, 2)}
 
 labels = {
     'ER': 'ER',
