@@ -209,12 +209,8 @@ class SingularAngles():
             The axes object with the plotted histogram.
         """
         for key, score in similarity_scores.items():
-            if ('ER' in key) and (key != 'ER-ER'):
-                ax.hist(score, density=True, color=colors[key], label=labels[key],
-                        edgecolor='#332288', linewidth=1.5, histtype="stepfilled")
-            else:
-                ax.hist(score, density=True, color=colors[key], label=labels[key], linewidth=0,
-                        histtype="stepfilled")
+            ax.hist(score, density=True, color=colors[key][1], label=labels[key],
+                    edgecolor=colors[key][0], linewidth=1.5, histtype="stepfilled")
 
         if legend:
             ax.legend()
