@@ -177,15 +177,15 @@ def calc_p_values(connectome_type):
     comparisons = []
     for i, network_i in enumerate(networks):
         for j, network_j in enumerate(networks):
-        if j >= i:
-            comparisons.append(f'{network_i}-{network_j}')
-dummy_data_array = np.zeros((len(comparisons), len(comparisons)))
-p_values = xr.DataArray(
-    dummy_data_array,
-    coords={'comparison_0': comparisons, 'comparison_1': comparisons},
-    dims=['comparison_0', 'comparison_1'])
+            if j >= i:
+                comparisons.append(f'{network_i}-{network_j}')
+    dummy_data_array = np.zeros((len(comparisons), len(comparisons)))
+    p_values = xr.DataArray(
+        dummy_data_array,
+        coords={'comparison_0': comparisons, 'comparison_1': comparisons},
+        dims=['comparison_0', 'comparison_1'])
 
-for meta_comparisons in combinations(comparisons, 2):
+    for meta_comparisons in combinations(comparisons, 2):
 
         # if self-similarity is at position 1, swap positions
         if (meta_comparisons[1].split('-')[0] == meta_comparisons[1].split('-')[1]):
