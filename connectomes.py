@@ -265,18 +265,18 @@ labels = {
 }
 
 
-def plot_connectome_similarity(connectomes, savename):
+def plot_connectome_similarity(connectomes, connectome_type, xlims):
 
     mosaic = """
         AAABBB.CCCCX
         AAABBB.CCCCX
         AAABBB.CCCCX
-        DDDEEE.FFFFY
-        DDDEEE.FFFFY
-        DDDEEE.FFFFY
-        GGGHHH.IIIIZ
-        GGGHHH.IIIIZ
-        GGGHHH.IIIIZ
+        DDDEEE.FFGGY
+        DDDEEE.FFGGY
+        DDDEEE.FFGGY
+        HHHIII.JJKKZ
+        HHHIII.JJKKZ
+        HHHIII.JJKKZ
         """
     fig = plt.figure(figsize=(15, 10), layout="constrained", dpi=1200)
     ax_dict = fig.subplot_mosaic(mosaic)
@@ -307,58 +307,84 @@ def plot_connectome_similarity(connectomes, savename):
                          cmap=colormap(colors['two_clusters']))
     ax.text(-0.1, 1.1, 'E', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
-    ax = ax_dict['G']
+    ax = ax_dict['H']
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['WS'], repetitions=1)[0],
                          name='square_WS', title=titles['WS'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['WS']))
-    ax.text(-0.1, 1.1, 'G', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    ax.text(-0.1, 1.1, 'H', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
-    ax = ax_dict['H']
+    ax = ax_dict['I']
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['BA'], repetitions=1)[0],
                          name='square_BA', title=titles['BA'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['BA']))
-    ax.text(-0.1, 1.1, 'H', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    ax.text(-0.1, 1.1, 'I', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
     ax = ax_dict['C']
     comparisons = ['ER-ER', 'DCM-DCM', 'one_cluster-one_cluster',
                    'two_clusters-two_clusters', 'BA-BA', 'WS-WS']  # 'ER-DCM']
     ax = singular_angles.plot_similarities(
-        similarity_scores={key: scores['square'][key] for key in comparisons},
+        similarity_scores={key: scores[connectome_type][key] for key in comparisons},
         colors=colors_comparisons,
         labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
         ax=ax, legend=False)
     ax.text(-0.1, 1.1, 'C', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
-    ax.set_xlim(0.025, 0.10)
+    ax.set_xlim(xlims[0])
     hs, ls = ax.get_legend_handles_labels()
     plot_legend(ax_dict['X'], hs, ls)
 
     ax = ax_dict['F']
     comparisons = [
-        'ER-DCM', 'ER-one_cluster', 'ER-two_clusters', 'ER-two_clusters', 'ER-BA', 'ER-WS']
+        'ER-DCM', 'ER-one_cluster', 'ER-two_clusters', 'ER-BA', 'ER-WS']
     ax = singular_angles.plot_similarities(
-        similarity_scores={key: scores['square'][key] for key in comparisons},
+        similarity_scores={key: scores[connectome_type][key] for key in comparisons},
         colors=colors_comparisons,
         labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
         ax=ax, legend=False)
     ax.text(-0.1, 1.1, 'F', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
-    ax.set_xlim(0.025, 0.10)
+    ax.set_xlim(xlims[1])
     hs, ls = ax.get_legend_handles_labels()
-    plot_legend(ax_dict['Y'], hs, ls)
-
-    ax = ax_dict['I']
+    ax = ax_dict['G']
     comparisons = [
-        'one_cluster-one_cluster', 'one_cluster-one_cluster_shuffled', 'two_clusters-two_clusters', 'two_clusters-two_clusters_shuffled', 'one_cluster-BA']
+        'DCM-one_cluster', 'DCM-two_clusters', 'DCM-BA', 'DCM-WS']
     ax = singular_angles.plot_similarities(
-        similarity_scores={key: scores['square'][key] for key in comparisons},
+        similarity_scores={key: scores[connectome_type][key] for key in comparisons},
         colors=colors_comparisons,
         labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
         ax=ax, legend=False)
-    ax.text(-0.1, 1.1, 'I', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
-    ax.set_xlim(0.025, 0.10)
+    ax.text(-0.1, 1.1, 'G', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    ax.set_xlim(xlims[1])
+    hs_, ls_ = ax.get_legend_handles_labels()
+    hs += hs_
+    ls += ls_
+    plot_legend(ax_dict['Y'], hs, ls)
+
+    ax = ax_dict['J']
+    comparisons = [
+        'one_cluster-two_clusters', 'one_cluster-BA', 'one_cluster-WS']
+    ax = singular_angles.plot_similarities(
+        similarity_scores={key: scores[connectome_type][key] for key in comparisons},
+        colors=colors_comparisons,
+        labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
+        ax=ax, legend=False)
+    ax.text(-0.1, 1.1, 'J', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    ax.set_xlim(xlims[1])
     hs, ls = ax.get_legend_handles_labels()
+    ax = ax_dict['K']
+    comparisons = [
+        'two_clusters-BA', 'two_clusters-WS', 'WS-BA']
+    ax = singular_angles.plot_similarities(
+        similarity_scores={key: scores[connectome_type][key] for key in comparisons},
+        colors=colors_comparisons,
+        labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
+        ax=ax, legend=False)
+    ax.text(-0.1, 1.1, 'K', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    ax.set_xlim(xlims[1])
+    hs_, ls_ = ax.get_legend_handles_labels()
+    hs += hs_
+    ls += ls_
     plot_legend(ax_dict['Z'], hs, ls)
 
-    plt.savefig(f'plots/connectomes_and_similarity_{savename}.pdf')
+    plt.savefig(f'plots/connectomes_and_similarity_{connectome_type}.pdf')
 
 
 def plot_p_values_reduced(p_values, savename='p_values_reduced'):
@@ -375,7 +401,6 @@ def plot_p_values_reduced(p_values, savename='p_values_reduced'):
                                               comparison_1=comparison_1)
         score_labels[:, i, 0] = [f'{n}-{n}' for n in networks][i]
         score_labels[:, i, 1] = comparison_1
-
 
     np.fill_diagonal(p_values_reduced, np.nan)
 
@@ -454,89 +479,94 @@ def plot_p_values_reduced(p_values, savename='p_values_reduced'):
     plt.savefig(f'plots/{savename}.pdf')
 
 
-def plot_p_values(p_values, savename='p_values'):
+# def plot_p_values(p_values, savename='p_values'):
 
-    # plot p values
-    # Define colormap for p-values
-    top = cm.get_cmap('Blues', 1000)
-    bottom = cm.get_cmap('Reds', 1000)
-    newcolors = np.vstack((top(np.linspace(0.95, 0.6, 1000)),
-                           bottom(np.linspace(0.45, 0.9, 1000))))
-    newcmp = ListedColormap(newcolors)
-    sig = 0.05 / (len(comparisons) * (len(comparisons) - 1)) / 2
-    sig_alpha = np.log10(sig)
-    newnorm = TwoSlopeNorm(vmin=-50, vcenter=sig_alpha, vmax=0)
-    n = len(comparisons)
+#     # plot p values
+#     # Define colormap for p-values
+#     top = cm.get_cmap('Blues', 1000)
+#     bottom = cm.get_cmap('Reds', 1000)
+#     newcolors = np.vstack((top(np.linspace(0.95, 0.6, 1000)),
+#                            bottom(np.linspace(0.45, 0.9, 1000))))
+#     newcmp = ListedColormap(newcolors)
+#     sig = 0.05 / (len(comparisons) * (len(comparisons) - 1)) / 2
+#     sig_alpha = np.log10(sig)
+#     newnorm = TwoSlopeNorm(vmin=-50, vcenter=sig_alpha, vmax=0)
+#     n = len(comparisons)
 
-    mosaic = """
-        AAAAAAAAAAAAAA..
-        AAAAAAAAAAAAAA.B
-        AAAAAAAAAAAAAA.B
-        AAAAAAAAAAAAAA.B
-        AAAAAAAAAAAAAA.B
-        AAAAAAAAAAAAAA.B
-        AAAAAAAAAAAAAA.B
-        AAAAAAAAAAAAAA.B
-        AAAAAAAAAAAAAA.B
-        AAAAAAAAAAAAAA.B
-        AAAAAAAAAAAAAA.B
-        AAAAAAAAAAAAAA.B
-        AAAAAAAAAAAAAA.B
-        """
-    fig = plt.figure(figsize=(10, 9), layout="constrained")
-    ax_dict = fig.subplot_mosaic(mosaic)
+#     mosaic = """
+#         AAAAAAAAAAAAAA..
+#         AAAAAAAAAAAAAA.B
+#         AAAAAAAAAAAAAA.B
+#         AAAAAAAAAAAAAA.B
+#         AAAAAAAAAAAAAA.B
+#         AAAAAAAAAAAAAA.B
+#         AAAAAAAAAAAAAA.B
+#         AAAAAAAAAAAAAA.B
+#         AAAAAAAAAAAAAA.B
+#         AAAAAAAAAAAAAA.B
+#         AAAAAAAAAAAAAA.B
+#         AAAAAAAAAAAAAA.B
+#         AAAAAAAAAAAAAA.B
+#         """
+#     fig = plt.figure(figsize=(10, 9), layout="constrained")
+#     ax_dict = fig.subplot_mosaic(mosaic)
 
-    # Plot color mesh
-    ax = ax_dict['A']
-    ax.pcolormesh(np.log10(p_values.T), cmap=newcmp, norm=newnorm)
-    # Add text
-    for x in range(n):
-        for y in range(n):
-            try:
-                if np.log10(p_values[x, y]) > -1:
-                    ax.text(
-                        x + 0.5, y + 0.5, s=f'{np.round(np.log10(p_values[x, y]), 2)}', va='center', ha='center',
-                        color='white', fontsize=10)
-                else:
-                    ax.text(x + 0.5, y + 0.5, s=f'{int(np.log10(p_values[x, y]))}',
-                            va='center', ha='center', color='white', fontsize=10)
-            except OverflowError:
-                pass
-            except ValueError:
-                pass
-    # Add white lines around each entry
-    ax.set_xticks(np.arange(0, n + 1, step=0.5), minor=True)
-    ax.set_yticks(np.arange(0, n + 1, step=0.5), minor=True)
-    ax.grid(which='minor', color='white', linestyle='-', linewidth=0.5)
-    ax.tick_params(which="minor", bottom=False, left=False)
-    # Format ticks
-    ax.set_xticks(np.arange(0.5, n - 1))
-    ax.set_xticklabels([])
-    ax.set_yticks(np.arange(1.5, n))
-    ax.set_yticklabels([])
-    ax.set_xticklabels([f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons][:-1],
-                       rotation=45, ha='right', va='top')
-    ax.set_yticklabels([f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons][1:])
-    ax.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
-    ax.set_xlim(0, n)
-    ax.set_ylim(n, 0)
+#     # Plot color mesh
+#     ax = ax_dict['A']
+#     ax.pcolormesh(np.log10(p_values.T), cmap=newcmp, norm=newnorm)
+#     # Add text
+#     for x in range(n):
+#         for y in range(n):
+#             try:
+#                 if np.log10(p_values[x, y]) > -1:
+#                     ax.text(
+#                         x + 0.5, y + 0.5, s=f'{np.round(np.log10(p_values[x, y]), 2)}', va='center', ha='center',
+#                         color='white', fontsize=10)
+#                 else:
+#                     ax.text(x + 0.5, y + 0.5, s=f'{int(np.log10(p_values[x, y]))}',
+#                             va='center', ha='center', color='white', fontsize=10)
+#             except OverflowError:
+#                 pass
+#             except ValueError:
+#                 pass
+#     # Add white lines around each entry
+#     ax.set_xticks(np.arange(0, n + 1, step=0.5), minor=True)
+#     ax.set_yticks(np.arange(0, n + 1, step=0.5), minor=True)
+#     ax.grid(which='minor', color='white', linestyle='-', linewidth=0.5)
+#     ax.tick_params(which="minor", bottom=False, left=False)
+#     # Format ticks
+#     ax.set_xticks(np.arange(0.5, n - 1))
+#     ax.set_xticklabels([])
+#     ax.set_yticks(np.arange(1.5, n))
+#     ax.set_yticklabels([])
+#     ax.set_xticklabels([f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons][:-1],
+#                        rotation=45, ha='right', va='top')
+#     ax.set_yticklabels([f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons][1:])
+#     ax.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
+#     ax.set_xlim(0, n)
+#     ax.set_ylim(n, 0)
 
-    # Inset for the colorbar
-    cb = mpl.colorbar.ColorbarBase(ax_dict['B'], cmap=newcmp,
-                                   norm=newnorm,
-                                   boundaries=np.arange(-51, 0.1, step=0.1),
-                                   # orientation='vertical',
-                                   ticks=[-50, -40, -30, -20, -10, sig_alpha, 0])
-    for t in cb.ax.get_xticklabels():
-        t.set_fontsize(6)
-    cb.ax.set_xlabel('log of p-value')
-    # cb.ax.set_xlim(-21, -0.1)
+#     # Inset for the colorbar
+#     cb = mpl.colorbar.ColorbarBase(ax_dict['B'], cmap=newcmp,
+#                                    norm=newnorm,
+#                                    boundaries=np.arange(-51, 0.1, step=0.1),
+#                                    # orientation='vertical',
+#                                    ticks=[-50, -40, -30, -20, -10, sig_alpha, 0])
+#     for t in cb.ax.get_xticklabels():
+#         t.set_fontsize(6)
+#     cb.ax.set_xlabel('log of p-value')
+#     # cb.ax.set_xlim(-21, -0.1)
 
-    plt.savefig(f'plots/{savename}.pdf')
+#     plt.savefig(f'plots/{savename}.pdf')
 
+xlims = {
+    'square': ((0.025, 0.10), (0.025, 0.055)),
+    'rectangular': ((0.025, 0.16), (0.025, 0.08))
+}
 
-plot_connectome_similarity(connectomes_square, 'square')
-plot_p_values_reduced(p_values)
+for connectome_type in ['rectangular']:
+    plot_connectome_similarity(connectome_dict[connectome_type], connectome_type, xlims[connectome_type])
+    plot_p_values_reduced(calc_p_values(connectome_type), f'p_values_reduced_{connectome_type}')
 
 # plot_connectome_similarity(connectomes_rectangular, 'rectangular')
 
