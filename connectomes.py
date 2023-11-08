@@ -154,7 +154,7 @@ titles = {
     'BA': 'Barabasi-Albert',
 }
 
-score_name = 'scores_'
+score_name = 'scores'
 
 try:
     scores = np.load(f'{score_name}.npy', allow_pickle=True).item()
@@ -469,87 +469,6 @@ def plot_p_values_reduced(p_values, savename='p_values_reduced'):
     # cb.ax.set_xlim(-21, -0.1)
 
     plt.savefig(f'plots/{savename}.pdf')
-
-
-# def plot_p_values(p_values, savename='p_values'):
-
-#     # plot p values
-#     # Define colormap for p-values
-#     top = cm.get_cmap('Blues', 1000)
-#     bottom = cm.get_cmap('Reds', 1000)
-#     newcolors = np.vstack((top(np.linspace(0.95, 0.6, 1000)),
-#                            bottom(np.linspace(0.45, 0.9, 1000))))
-#     newcmp = ListedColormap(newcolors)
-#     sig = 0.05 / (len(comparisons) * (len(comparisons) - 1)) / 2
-#     sig_alpha = np.log10(sig)
-#     newnorm = TwoSlopeNorm(vmin=-50, vcenter=sig_alpha, vmax=0)
-#     n = len(comparisons)
-
-#     mosaic = """
-#         AAAAAAAAAAAAAA..
-#         AAAAAAAAAAAAAA.B
-#         AAAAAAAAAAAAAA.B
-#         AAAAAAAAAAAAAA.B
-#         AAAAAAAAAAAAAA.B
-#         AAAAAAAAAAAAAA.B
-#         AAAAAAAAAAAAAA.B
-#         AAAAAAAAAAAAAA.B
-#         AAAAAAAAAAAAAA.B
-#         AAAAAAAAAAAAAA.B
-#         AAAAAAAAAAAAAA.B
-#         AAAAAAAAAAAAAA.B
-#         AAAAAAAAAAAAAA.B
-#         """
-#     fig = plt.figure(figsize=(10, 9), layout="constrained")
-#     ax_dict = fig.subplot_mosaic(mosaic)
-
-#     # Plot color mesh
-#     ax = ax_dict['A']
-#     ax.pcolormesh(np.log10(p_values.T), cmap=newcmp, norm=newnorm)
-#     # Add text
-#     for x in range(n):
-#         for y in range(n):
-#             try:
-#                 if np.log10(p_values[x, y]) > -1:
-#                     ax.text(
-#                         x + 0.5, y + 0.5, s=f'{np.round(np.log10(p_values[x, y]), 2)}', va='center', ha='center',
-#                         color='white', fontsize=10)
-#                 else:
-#                     ax.text(x + 0.5, y + 0.5, s=f'{int(np.log10(p_values[x, y]))}',
-#                             va='center', ha='center', color='white', fontsize=10)
-#             except OverflowError:
-#                 pass
-#             except ValueError:
-#                 pass
-#     # Add white lines around each entry
-#     ax.set_xticks(np.arange(0, n + 1, step=0.5), minor=True)
-#     ax.set_yticks(np.arange(0, n + 1, step=0.5), minor=True)
-#     ax.grid(which='minor', color='white', linestyle='-', linewidth=0.5)
-#     ax.tick_params(which="minor", bottom=False, left=False)
-#     # Format ticks
-#     ax.set_xticks(np.arange(0.5, n - 1))
-#     ax.set_xticklabels([])
-#     ax.set_yticks(np.arange(1.5, n))
-#     ax.set_yticklabels([])
-#     ax.set_xticklabels([f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons][:-1],
-#                        rotation=45, ha='right', va='top')
-#     ax.set_yticklabels([f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons][1:])
-#     ax.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
-#     ax.set_xlim(0, n)
-#     ax.set_ylim(n, 0)
-
-#     # Inset for the colorbar
-#     cb = mpl.colorbar.ColorbarBase(ax_dict['B'], cmap=newcmp,
-#                                    norm=newnorm,
-#                                    boundaries=np.arange(-51, 0.1, step=0.1),
-#                                    # orientation='vertical',
-#                                    ticks=[-50, -40, -30, -20, -10, sig_alpha, 0])
-#     for t in cb.ax.get_xticklabels():
-#         t.set_fontsize(6)
-#     cb.ax.set_xlabel('log of p-value')
-#     # cb.ax.set_xlim(-21, -0.1)
-
-#     plt.savefig(f'plots/{savename}.pdf')
 
 xlims = {
     'square': ((0.025, 0.10), (0.025, 0.055)),
