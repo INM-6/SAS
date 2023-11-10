@@ -53,8 +53,8 @@ def directed_configuration_model(size, mean_connection_prob, np_seed=1):
         return degrees.astype(int)
 
     total_connections = int(mean_connection_prob * size[0] * size[1])
-    indegrees = calc_degrees(size[1], total_connections, np_seed)
-    outdegrees = calc_degrees(size[0], total_connections, np_seed + 1)
+    indegrees = calc_degrees(size[0], total_connections, np_seed)
+    outdegrees = calc_degrees(size[1], total_connections, np_seed + 1)
 
     graph = nx.directed_configuration_model(in_degree_sequence=indegrees, out_degree_sequence=outdegrees)
     graph.remove_edges_from(nx.selfloop_edges(graph))
@@ -73,13 +73,28 @@ def directed_configuration_model(size, mean_connection_prob, np_seed=1):
 def watts_strogatz(size, mean_connection_prob, p=0.3):
     graph = nx.watts_strogatz_graph(np.maximum(size[0], size[1]), k=int(
         mean_connection_prob * (np.maximum(size[0], size[1]) - 1)), p=p)
-    return nx.to_numpy_array(graph).T[:size[0], :size[1]]
+    matrix = nx.to_numpy_array(graph).T
+    if size[0] != size[1]:
+        matrix = _rectangularize(matrix, size)
+    return matrix
 
 
 def barabasi_albert(size, mean_connection_prob):
     graph = nx.barabasi_albert_graph(np.maximum(size[0], size[1]), m=int(
         mean_connection_prob * (np.maximum(size[0], size[1]) - 1) / 2))
-    return nx.to_numpy_array(graph).T[:size[0], :size[1]]
+    matrix = nx.to_numpy_array(graph).T
+    if size[0] != size[1]:
+        matrix = _rectangularize(matrix, size)
+    return matrix
+
+
+def _rectangularize(matrix, size):
+    random_choice = np.random.choice(np.maximum(size[0], size[1]), size=np.minimum(size[0], size[1]), replace=False)
+    if size[0] < size[1]:
+        matrix = matrix[random_choice, :]
+    else:
+        matrix = matrix[:, random_choice]
+    return matrix
 
 
 def plot_connectome(connectome, name, title, fig=None, ax=None, save=True, cmap='Greens'):
@@ -120,10 +135,10 @@ connectomes_rectangular = {}
 connectomes_rectangular['ER'] = erdos_renyi_connectome(size_rectangular, mean_connection_prob)
 connectomes_rectangular['DCM'] = directed_configuration_model(size_rectangular, mean_connection_prob)
 connectomes_rectangular['one_cluster'] = clustered_connectome(size_rectangular, clusters=[(0, 50)],
-                                                              rel_cluster_weights=[100],
+                                                              rel_cluster_weights=[10],
                                                               mean_connection_prob=mean_connection_prob)
-connectomes_rectangular['two_clusters'] = clustered_connectome(size_rectangular, clusters=[(50, 100), (100, 150)],
-                                                               rel_cluster_weights=[20, 80],
+connectomes_rectangular['two_clusters'] = clustered_connectome(size_rectangular, clusters=[(50, 85), (85, 100)],
+                                                               rel_cluster_weights=[10, 10],
                                                                mean_connection_prob=mean_connection_prob)
 connectomes_rectangular['WS'] = watts_strogatz(size_rectangular, mean_connection_prob, p=0.3)
 connectomes_rectangular['BA'] = barabasi_albert(size_rectangular, mean_connection_prob)
@@ -145,7 +160,7 @@ os.makedirs('plots', exist_ok=True)
 # compare all connectomes with each other
 titles = {
     'ER': 'Erdős-Rényi',
-    'DCM': 'Directed configuration model',
+    'DCM': 'directed configuration model',
     'one_cluster': 'one cluster',
     'two_clusters': 'two clusters',
     'one_cluster_shuffled': 'one cluster - shuffled',
@@ -162,17 +177,17 @@ try:
 except FileNotFoundError:
     print('Scores not found on disk. Calculating...')
     scores = {}
-    for connectome_type, connectomes in connectome_dict.items():
-        scores[connectome_type] = {}
+    for matrix_shape, connectomes in connectome_dict.items():
+        scores[matrix_shape] = {}
         for rule_1, rule_2 in combinations_with_replacement(connectomes.keys(), 2):
             score = singular_angles.similarity(connectomes[rule_1], connectomes[rule_2])
-            scores[connectome_type][f'{rule_1}-{rule_2}'] = score
+            scores[matrix_shape][f'{rule_1}-{rule_2}'] = score
             print(f"The similarity of {rule_1} and {rule_2} is {np.round(np.mean(score), 2)} ± "
                   f"{np.round(np.std(score), 2)}")
     np.save(f'{score_name}.npy', scores)
 
 
-def calc_p_values(connectome_type):
+def calc_p_values(matrix_shape):
     # calculate p values between distributions
     comparisons = []
     for i, network_i in enumerate(networks):
@@ -198,14 +213,9 @@ def calc_p_values(connectome_type):
 
         if ((meta_comparisons[0].split('-')[0] == meta_comparisons[0].split('-')[1])
                 and (meta_comparisons[0].split('-')[0] in meta_comparisons[1].split('-'))):
-            try:
-                _, p_value = stats.ttest_ind(
-                    scores[connectome_type][meta_comparisons[0]], scores[connectome_type][meta_comparisons[1]],
-                    equal_var=False)
-            except KeyError:
-                _, p_value = stats.ttest_ind(
-                    scores[connectome_type][meta_comparisons[0]], scores[connectome_type][meta_comparisons[1]],
-                    equal_var=False)
+            _, p_value = stats.ttest_ind(
+                scores[matrix_shape][meta_comparisons[0]], scores[matrix_shape][meta_comparisons[1]],
+                equal_var=False)
             p_values.loc[meta_comparisons[0], meta_comparisons[1]] = p_value
 
     return p_values
@@ -221,10 +231,7 @@ def colormap(base_color):
 
 
 def plot_legend(ax, hs, ls):
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['left'].set_visible(False)
+    ax.spines[['top', 'right', 'bottom', 'left']].set_visible(False)
     ax.tick_params(axis='both', which='both', length=0)
     ax.set_xticks([])
     ax.set_yticks([])
@@ -257,57 +264,72 @@ labels = {
 }
 
 
-def plot_connectome_similarity(connectomes, connectome_type, xlims):
+def plot_connectome_similarity(connectomes, matrix_shape, xlims):
 
-    mosaic = """
-        AAABBB.CCCCX
-        AAABBB.CCCCX
-        AAABBB.CCCCX
-        DDDEEE.FFGGY
-        DDDEEE.FFGGY
-        DDDEEE.FFGGY
-        HHHIII.JJKKZ
-        HHHIII.JJKKZ
-        HHHIII.JJKKZ
-        """
-    fig = plt.figure(figsize=(15, 10), layout="constrained", dpi=1200)
+    if matrix_shape == 'square':
+        mosaic = """
+            AAABBB.CCCCX
+            AAABBB.CCCCX
+            AAABBB.CCCCX
+            DDDEEE.FFGGY
+            DDDEEE.FFGGY
+            DDDEEE.FFGGY
+            HHHIII.JJKKZ
+            HHHIII.JJKKZ
+            HHHIII.JJKKZ
+            """
+        fig = plt.figure(figsize=(15, 10), layout="constrained", dpi=1200)
+        connectome_titles = titles
+    elif matrix_shape == 'rectangular':
+        mosaic = """
+            AABB.CCCCCCX
+            AABB.CCCCCCX
+            AABB.CCCCCCX
+            DDEE.FFFGGGY
+            DDEE.FFFGGGY
+            DDEE.FFFGGGY
+            HHII.JJJKKKZ
+            HHII.JJJKKKZ
+            HHII.JJJKKKZ
+            """
+        fig = plt.figure(figsize=(15, 10), layout="constrained", dpi=1200)
+        connectome_titles = labels
     ax_dict = fig.subplot_mosaic(mosaic)
 
     # --- PLOT CONNECTOMES ---
-
     ax = ax_dict['A']
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['ER'], repetitions=1)[0],
-                         name='square_ER', title=titles['ER'], fig=fig, ax=ax, save=False,
+                         name='square_ER', title=connectome_titles['ER'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['ER']))
     ax.text(-0.1, 1.1, 'A', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
     ax = ax_dict['B']
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['DCM'], repetitions=1)[0],
-                         name='square_DCM', title=titles['DCM'], fig=fig, ax=ax, save=False,
+                         name='square_DCM', title=connectome_titles['DCM'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['DCM']))
     ax.text(-0.1, 1.1, 'B', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
     ax = ax_dict['D']
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['one_cluster'], repetitions=1)[0],
-                         name='square_one_cluster', title=titles['one_cluster'], fig=fig, ax=ax, save=False,
+                         name='square_one_cluster', title=connectome_titles['one_cluster'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['one_cluster']))
     ax.text(-0.1, 1.1, 'D', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
     ax = ax_dict['E']
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['two_clusters'], repetitions=1)[0],
-                         name='square_two_clusters', title=titles['two_clusters'], fig=fig, ax=ax, save=False,
+                         name='square_two_clusters', title=connectome_titles['two_clusters'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['two_clusters']))
     ax.text(-0.1, 1.1, 'E', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
     ax = ax_dict['H']
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['WS'], repetitions=1)[0],
-                         name='square_WS', title=titles['WS'], fig=fig, ax=ax, save=False,
+                         name='square_WS', title=connectome_titles['WS'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['WS']))
     ax.text(-0.1, 1.1, 'H', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
     ax = ax_dict['I']
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['BA'], repetitions=1)[0],
-                         name='square_BA', title=titles['BA'], fig=fig, ax=ax, save=False,
+                         name='square_BA', title=connectome_titles['BA'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['BA']))
     ax.text(-0.1, 1.1, 'I', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
@@ -315,7 +337,7 @@ def plot_connectome_similarity(connectomes, connectome_type, xlims):
     comparisons = ['ER-ER', 'DCM-DCM', 'one_cluster-one_cluster',
                    'two_clusters-two_clusters', 'BA-BA', 'WS-WS']  # 'ER-DCM']
     ax = singular_angles.plot_similarities(
-        similarity_scores={key: scores[connectome_type][key] for key in comparisons},
+        similarity_scores={key: scores[matrix_shape][key] for key in comparisons},
         colors=colors_comparisons,
         labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
         ax=ax, legend=False)
@@ -325,10 +347,9 @@ def plot_connectome_similarity(connectomes, connectome_type, xlims):
     plot_legend(ax_dict['X'], hs, ls)
 
     ax = ax_dict['F']
-    comparisons = [
-        'ER-DCM', 'ER-one_cluster', 'ER-two_clusters', 'ER-BA', 'ER-WS']
+    comparisons = ['ER-DCM', 'ER-one_cluster', 'ER-two_clusters', 'ER-BA', 'ER-WS']
     ax = singular_angles.plot_similarities(
-        similarity_scores={key: scores[connectome_type][key] for key in comparisons},
+        similarity_scores={key: scores[matrix_shape][key] for key in comparisons},
         colors=colors_comparisons,
         labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
         ax=ax, legend=False)
@@ -336,10 +357,9 @@ def plot_connectome_similarity(connectomes, connectome_type, xlims):
     ax.set_xlim(xlims[1])
     hs, ls = ax.get_legend_handles_labels()
     ax = ax_dict['G']
-    comparisons = [
-        'DCM-one_cluster', 'DCM-two_clusters', 'DCM-BA', 'DCM-WS']
+    comparisons = ['DCM-one_cluster', 'DCM-two_clusters', 'DCM-BA', 'DCM-WS']
     ax = singular_angles.plot_similarities(
-        similarity_scores={key: scores[connectome_type][key] for key in comparisons},
+        similarity_scores={key: scores[matrix_shape][key] for key in comparisons},
         colors=colors_comparisons,
         labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
         ax=ax, legend=False)
@@ -351,10 +371,9 @@ def plot_connectome_similarity(connectomes, connectome_type, xlims):
     plot_legend(ax_dict['Y'], hs, ls)
 
     ax = ax_dict['J']
-    comparisons = [
-        'one_cluster-two_clusters', 'one_cluster-BA', 'one_cluster-WS']
+    comparisons = ['one_cluster-two_clusters', 'one_cluster-BA', 'one_cluster-WS']
     ax = singular_angles.plot_similarities(
-        similarity_scores={key: scores[connectome_type][key] for key in comparisons},
+        similarity_scores={key: scores[matrix_shape][key] for key in comparisons},
         colors=colors_comparisons,
         labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
         ax=ax, legend=False)
@@ -362,10 +381,9 @@ def plot_connectome_similarity(connectomes, connectome_type, xlims):
     ax.set_xlim(xlims[1])
     hs, ls = ax.get_legend_handles_labels()
     ax = ax_dict['K']
-    comparisons = [
-        'two_clusters-BA', 'two_clusters-WS', 'WS-BA']
+    comparisons = ['two_clusters-BA', 'two_clusters-WS', 'WS-BA']
     ax = singular_angles.plot_similarities(
-        similarity_scores={key: scores[connectome_type][key] for key in comparisons},
+        similarity_scores={key: scores[matrix_shape][key] for key in comparisons},
         colors=colors_comparisons,
         labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
         ax=ax, legend=False)
@@ -376,10 +394,10 @@ def plot_connectome_similarity(connectomes, connectome_type, xlims):
     ls += ls_
     plot_legend(ax_dict['Z'], hs, ls)
 
-    plt.savefig(f'plots/connectomes_and_similarity_{connectome_type}.pdf')
+    plt.savefig(f'plots/connectomes_and_similarity_{matrix_shape}.pdf')
 
 
-def plot_p_values_reduced(p_values, savename='p_values_reduced'):
+def plot_p_values_reduced(p_values, matrix_shape):
 
     p_values_reduced = np.zeros((len(networks), len(networks)))
     score_labels = np.empty((len(networks), len(networks), 2), dtype=object)
@@ -416,26 +434,26 @@ def plot_p_values_reduced(p_values, savename='p_values_reduced'):
 
     # Plot color mesh
     ax = ax_dict['A']
-    ax.pcolormesh(np.log10(p_values_reduced.T), cmap=newcmp, norm=newnorm)
+    ax.pcolormesh(np.log10(p_values_reduced), cmap=newcmp, norm=newnorm)
     # Add text
     for x in range(n):
         for y in range(n):
-            try:
-                if np.log10(p_values_reduced[x, y]) > -1:
-                    ax.text(
-                        x + 0.5, y + 0.5, s=f'{np.round(np.log10(p_values_reduced[x, y]), 2)}', va='center',
-                        ha='center', color='white', fontsize=7)
-                else:
-                    ax.text(x + 0.5, y + 0.5, s=f'{int(np.log10(p_values_reduced[x, y]))}',
-                            va='center', ha='center', color='white', fontsize=11)
-            except OverflowError:
-                pass
-            except ValueError:
-                pass
+            # try:
+            #     if np.log10(p_values_reduced[x, y]) > -1:
+            #         ax.text(
+            #             x + 0.5, y + 0.5, s=f'{np.round(np.log10(p_values_reduced[x, y]), 2)}', va='center',
+            #             ha='center', color='white', fontsize=7)
+            #     else:
+            #         ax.text(x + 0.5, y + 0.5, s=f'{int(np.log10(p_values_reduced[x, y]))}',
+            #                 va='center', ha='center', color='white', fontsize=11)
+            # except OverflowError:
+            #     pass
+            # except ValueError:
+            #     pass
 
-            ax.text(x + 0.8, y + 0.8, s=f"{np.round(np.mean(scores['square'][score_labels[x, y, 1]]), 2)}",
+            ax.text(x + 0.8, y + 0.8, s=f"{np.round(np.mean(scores[matrix_shape][score_labels[x, y, 1]]), 3)}",
                     va='center', ha='center', color='white', fontsize=7)
-            ax.text(x + 0.2, y + 0.2, s=f"{np.round(np.mean(scores['square'][score_labels[x, y, 0]]), 2)}",
+            ax.text(x + 0.2, y + 0.2, s=f"{np.round(np.mean(scores[matrix_shape][score_labels[x, y, 0]]), 3)}",
                     va='center', ha='center', color='white', fontsize=7)
 
     # Add white lines around each entry
@@ -451,8 +469,8 @@ def plot_p_values_reduced(p_values, savename='p_values_reduced'):
     ax.set_xticklabels([f'GT - {labels[n]}' for n in networks],
                        rotation=45, ha='right', va='top')
     ax.set_yticklabels([f'GT = {labels[n]}' for n in networks])
-    ax.set_ylabel('self-similarity (GT - GT)', size=20)
-    ax.set_xlabel('cross-similarity (GT - {...})', size=20)
+    ax.set_ylabel('self-similarity', size=18)
+    ax.set_xlabel('cross-similarity', size=18)
     ax.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
     ax.set_xlim(0, n)
     ax.set_ylim(n, 0)
@@ -468,18 +486,14 @@ def plot_p_values_reduced(p_values, savename='p_values_reduced'):
     cb.ax.set_xlabel('log of p-value')
     # cb.ax.set_xlim(-21, -0.1)
 
-    plt.savefig(f'plots/{savename}.pdf')
+    plt.savefig(f'plots/p_values_reduced_{matrix_shape}.pdf')
+
 
 xlims = {
     'square': ((0.025, 0.10), (0.025, 0.055)),
     'rectangular': ((0.025, 0.16), (0.025, 0.08))
 }
 
-for connectome_type in ['rectangular']:
-    plot_connectome_similarity(connectome_dict[connectome_type], connectome_type, xlims[connectome_type])
-    plot_p_values_reduced(calc_p_values(connectome_type), f'p_values_reduced_{connectome_type}')
-
-# plot_connectome_similarity(connectomes_rectangular, 'rectangular')
 
 # --- CALCULATE SIMILARITY FOR INCREASINGLY DIFFERENT MATRICES
 
@@ -519,44 +533,44 @@ def change_matrix(base_matrix_template, max_change_fraction=0.1, step_size=0.01,
 
 def calculate_dropoff(
         sizes=[(300, 300), (200, 450), (100, 900)],
-        connectome_types=['DCM', 'ER', 'one_cluster', 'two_clusters', 'WS', 'BA'],
+        connectome_types=['ER', 'DCM', 'one_cluster', 'two_clusters', 'WS', 'BA'],
         max_change_fraction=0.1, step_size=0.005, repetitions=5,
         savename='similarity_under_changes',
         log=False):
 
-    fig, axes = plt.subplots(1, len(sizes), figsize=(int(len(sizes) * 5), 5))
+    mosaic = """
+        AAABBBCCCX
+        """
+    fig = plt.figure(figsize=(int(len(sizes) * 5), 5), layout="constrained")
+    ax_dict = fig.subplot_mosaic(mosaic)
 
-    for i, size in enumerate(sizes):
-        ax = axes[i]
+    for ax_i, size in zip(['A', 'B', 'C'], sizes):
+        ax = ax_dict[ax_i]
         for connectome_type in connectome_types:
             if connectome_type == 'DCM':
                 connectome = directed_configuration_model(size, mean_connection_prob)
             elif connectome_type == 'ER':
                 connectome = erdos_renyi_connectome(size, mean_connection_prob)
             elif connectome_type == 'one_cluster':
-                connectome = clustered_connectome(size=size, clusters=[(0, 50)], rel_cluster_weights=[100],
+                connectome = clustered_connectome(size=size, clusters=[(0, 50)], rel_cluster_weights=[10],
                                                   mean_connection_prob=mean_connection_prob)
             elif connectome_type == 'two_clusters':
-                connectome = clustered_connectome(size, clusters=[(0, 40), (40, 50)],
-                                                  rel_cluster_weights=[50, 50],
+                connectome = clustered_connectome(size, clusters=[(50, 85), (85, 100)],
+                                                  rel_cluster_weights=[10, 10],
                                                   mean_connection_prob=mean_connection_prob)
-            elif connectome_type == 'watts_strogatz':
-                if size[0] != size[1]:
-                    continue
-                else:
-                    connectome = watts_strogatz(size, mean_connection_prob)
-            elif connectome_type == 'barabasi_albert':
-                if size[0] != size[1]:
-                    continue
-                else:
-                    connectome = barabasi_albert(size, mean_connection_prob)
+            elif connectome_type == 'WS':
+                connectome = watts_strogatz(size, mean_connection_prob)
+            elif connectome_type == 'BA':
+                connectome = barabasi_albert(size, mean_connection_prob)
+            else:
+                continue
             similarity_mean, similarity_std, changes, base_matrix = change_matrix(connectome, max_change_fraction,
                                                                                   step_size, repetitions)
             x = changes / (np.shape(base_matrix)[0] * np.shape(base_matrix)[1]) * 100
             ax.plot(x, similarity_mean, color=colors[connectome_type], label=titles[connectome_type])
             ax.fill_between(x, similarity_mean - similarity_std, similarity_mean + similarity_std, alpha=0.3,
                             color=colors[connectome_type])
-            ax.set_title(f'matrix size: {sizes[i][0]} x {sizes[i][1]}')
+            ax.set_title(f'matrix size: {size[0]} x {size[1]}')
         ax.set_xlabel('% of changed connections')
         ax.set_ylabel('similarity')
         ax.spines['top'].set_visible(False)
@@ -567,7 +581,13 @@ def calculate_dropoff(
             ax.set_yscale('log')
     if log:
         savename += '_log'
-    ax.legend(loc='upper right')
+    hs, ls = ax.get_legend_handles_labels()
+    plot_legend(ax_dict['X'], hs, ls)
     plt.savefig(f'plots/{savename}.png', dpi=600, bbox_inches='tight')
 
-# calculate_dropoff()
+
+for matrix_shape in ['square', 'rectangular']:
+    plot_connectome_similarity(connectome_dict[matrix_shape], matrix_shape, xlims[matrix_shape])
+    plot_p_values_reduced(calc_p_values(matrix_shape), matrix_shape)
+
+# calculate_dropoff(max_change_fraction=0.1, step_size=0.001, repetitions=5, log=True)
