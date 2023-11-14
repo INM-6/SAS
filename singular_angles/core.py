@@ -107,8 +107,10 @@ class SingularAngles():
         magnitude_b = np.linalg.norm(b, axis=axis)
         angle = np.arccos(dot_product / (magnitude_a * magnitude_b))
 
-        mask = np.isnan(angle) & np.isclose(dot_product, 1)
-        angle[mask] = 0
+        mask_pos1 = np.isnan(angle) & np.isclose(dot_product, 1)
+        angle[mask_pos1] = 0
+        mask_neg1 = np.isnan(angle) & np.isclose(dot_product, -1)
+        angle[mask_neg1] = np.pi
 
         return angle
 
