@@ -230,12 +230,12 @@ def colormap(base_color):
     return cmap
 
 
-def plot_legend(ax, hs, ls):
+def plot_legend(ax, hs, ls, loc=(0.1, 0.1), fontsize=9):
     ax.spines[['top', 'right', 'bottom', 'left']].set_visible(False)
     ax.tick_params(axis='both', which='both', length=0)
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.legend(hs, ls, frameon=False, loc=(0.1, 0.1), ncol=1)
+    ax.legend(hs, ls, frameon=False, loc=loc, ncol=1, fontsize=fontsize)
 
 
 colors = {
@@ -268,31 +268,38 @@ def plot_connectome_similarity(connectomes, matrix_shape, xlims):
 
     if matrix_shape == 'square':
         mosaic = """
-            AAABBB.CCCCX
-            AAABBB.CCCCX
-            AAABBB.CCCCX
-            DDDEEE.FFGGY
-            DDDEEE.FFGGY
-            DDDEEE.FFGGY
-            HHHIII.JJKKZ
-            HHHIII.JJKKZ
-            HHHIII.JJKKZ
+            AAABBB.GGGGX
+            AAABBB.GGGGX
+            AAABBB.GGGGX
+            CCCDDD.GGGGX
+            CCCDDD.GGGGX
+            CCCDDD.GGGGX
+            EEEFFF.GGGGX
+            EEEFFF.GGGGX
+            EEEFFF.GGGGX
             """
         fig = plt.figure(figsize=(15, 10), layout="constrained", dpi=1200)
         connectome_titles = titles
     elif matrix_shape == 'rectangular':
         mosaic = """
-            AABB.CCCCCCX
-            AABB.CCCCCCX
-            AABB.CCCCCCX
-            DDEE.FFFGGGY
-            DDEE.FFFGGGY
-            DDEE.FFFGGGY
-            HHII.JJJKKKZ
-            HHII.JJJKKKZ
-            HHII.JJJKKKZ
+            AABB.GGGGGGX
+            AABB.GGGGGGX
+            AABB.GGGGGGX
+            AABB.GGGGGGX
+            .....GGGGGGX
+            .....GGGGGGX
+            CCDD.GGGGGGX
+            CCDD.GGGGGGX
+            CCDD.GGGGGGX
+            CCDD.GGGGGGX
+            .....GGGGGGX
+            .....GGGGGGX
+            EEFF.GGGGGGX
+            EEFF.GGGGGGX
+            EEFF.GGGGGGX
+            EEFF.GGGGGGX
             """
-        fig = plt.figure(figsize=(15, 10), layout="constrained", dpi=1200)
+        fig = plt.figure(figsize=(15, 12), layout="constrained", dpi=1200)
         connectome_titles = labels
     ax_dict = fig.subplot_mosaic(mosaic)
 
@@ -301,98 +308,72 @@ def plot_connectome_similarity(connectomes, matrix_shape, xlims):
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['ER'], repetitions=1)[0],
                          name='square_ER', title=connectome_titles['ER'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['ER']))
-    ax.text(-0.1, 1.1, 'A', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    ax.text(-0.1, 1.15, 'A', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
     ax = ax_dict['B']
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['DCM'], repetitions=1)[0],
                          name='square_DCM', title=connectome_titles['DCM'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['DCM']))
-    ax.text(-0.1, 1.1, 'B', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    ax.text(-0.1, 1.15, 'B', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
-    ax = ax_dict['D']
+    ax = ax_dict['C']
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['one_cluster'], repetitions=1)[0],
                          name='square_one_cluster', title=connectome_titles['one_cluster'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['one_cluster']))
-    ax.text(-0.1, 1.1, 'D', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    ax.text(-0.1, 1.15, 'C', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
-    ax = ax_dict['E']
+    ax = ax_dict['D']
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['two_clusters'], repetitions=1)[0],
                          name='square_two_clusters', title=connectome_titles['two_clusters'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['two_clusters']))
-    ax.text(-0.1, 1.1, 'E', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    ax.text(-0.1, 1.15, 'D', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
-    ax = ax_dict['H']
+    ax = ax_dict['E']
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['WS'], repetitions=1)[0],
                          name='square_WS', title=connectome_titles['WS'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['WS']))
-    ax.text(-0.1, 1.1, 'H', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    ax.text(-0.1, 1.15, 'E', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
-    ax = ax_dict['I']
+    ax = ax_dict['F']
     ax = plot_connectome(connectome=singular_angles.draw(connectomes['BA'], repetitions=1)[0],
                          name='square_BA', title=connectome_titles['BA'], fig=fig, ax=ax, save=False,
                          cmap=colormap(colors['BA']))
-    ax.text(-0.1, 1.1, 'I', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    ax.text(-0.1, 1.15, 'F', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
-    ax = ax_dict['C']
-    comparisons = ['ER-ER', 'DCM-DCM', 'one_cluster-one_cluster',
-                   'two_clusters-two_clusters', 'BA-BA', 'WS-WS']  # 'ER-DCM']
-    ax = singular_angles.plot_similarities(
-        similarity_scores={key: scores[matrix_shape][key] for key in comparisons},
-        colors=colors_comparisons,
-        labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
-        ax=ax, legend=False)
-    ax.text(-0.1, 1.1, 'C', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
-    ax.set_xlim(xlims[0])
-    hs, ls = ax.get_legend_handles_labels()
-    plot_legend(ax_dict['X'], hs, ls)
-
-    ax = ax_dict['F']
-    comparisons = ['ER-DCM', 'ER-one_cluster', 'ER-two_clusters', 'ER-BA', 'ER-WS']
-    ax = singular_angles.plot_similarities(
-        similarity_scores={key: scores[matrix_shape][key] for key in comparisons},
-        colors=colors_comparisons,
-        labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
-        ax=ax, legend=False)
-    ax.text(-0.1, 1.1, 'F', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
-    ax.set_xlim(xlims[1])
-    hs, ls = ax.get_legend_handles_labels()
     ax = ax_dict['G']
-    comparisons = ['DCM-one_cluster', 'DCM-two_clusters', 'DCM-BA', 'DCM-WS']
-    ax = singular_angles.plot_similarities(
-        similarity_scores={key: scores[matrix_shape][key] for key in comparisons},
-        colors=colors_comparisons,
-        labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
-        ax=ax, legend=False)
-    ax.text(-0.1, 1.1, 'G', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
-    ax.set_xlim(xlims[1])
-    hs_, ls_ = ax.get_legend_handles_labels()
-    hs += hs_
-    ls += ls_
-    plot_legend(ax_dict['Y'], hs, ls)
-
-    ax = ax_dict['J']
-    comparisons = ['one_cluster-two_clusters', 'one_cluster-BA', 'one_cluster-WS']
-    ax = singular_angles.plot_similarities(
-        similarity_scores={key: scores[matrix_shape][key] for key in comparisons},
-        colors=colors_comparisons,
-        labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
-        ax=ax, legend=False)
-    ax.text(-0.1, 1.1, 'J', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
-    ax.set_xlim(xlims[1])
-    hs, ls = ax.get_legend_handles_labels()
-    ax = ax_dict['K']
-    comparisons = ['two_clusters-BA', 'two_clusters-WS', 'WS-BA']
-    ax = singular_angles.plot_similarities(
-        similarity_scores={key: scores[matrix_shape][key] for key in comparisons},
-        colors=colors_comparisons,
-        labels={c: f"{labels[c.split('-')[0]]} - {labels[c.split('-')[1]]}" for c in comparisons},
-        ax=ax, legend=False)
-    ax.text(-0.1, 1.1, 'K', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
-    ax.set_xlim(xlims[1])
-    hs_, ls_ = ax.get_legend_handles_labels()
-    hs += hs_
-    ls += ls_
-    plot_legend(ax_dict['Z'], hs, ls)
+    # ax.text(-0.1, 1.1, ' ', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    ax.text(-0.05, 1.02, 'G', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+    ax.set_yticks([])
+    ax.set_xticks([])
+    ax.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
+    num_plots = len(list(colors_comparisons.keys()))
+    hs, ls = [], []
+    for i, (comparison, color) in enumerate(colors_comparisons.items()):
+        axin = ax.inset_axes([0, 1 - (1 / num_plots) * (i + 1), 1, 1 / (num_plots * 0.9)])
+        axin.set_yticks([])
+        rect = axin.patch
+        rect.set_alpha(0)
+        if i != num_plots - 1:
+            axin.set_xticks([])
+            axin.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
+        else:
+            axin.spines[['right', 'top', 'left']].set_visible(False)
+            axin.set_xlabel('similarity')
+        hist = axin.hist(scores[matrix_shape][comparison], density=True, color=color[1], edgecolor=color[0],
+                         linewidth=1.5, histtype="stepfilled",
+                         label=f"{labels[comparison.split('-')[0]]} - {labels[comparison.split('-')[1]]}")
+        x = np.linspace(xlims[0][0], hist[1][0])
+        axin.plot(x, np.zeros_like(x), color=color[0], linewidth=1.5)
+        x = np.linspace(hist[1][-1], xlims[0][1])
+        axin.plot(x, np.zeros_like(x), color=color[0], linewidth=1.5)
+        axin.set_xlim(xlims[0])
+        hs_, ls_ = axin.get_legend_handles_labels()
+        hs += hs_
+        ls += ls_
+    if matrix_shape == 'square':
+        plot_legend(ax_dict['X'], hs, ls, loc=(0, 0), fontsize=11.37)
+    elif matrix_shape == 'rectangular':
+        plot_legend(ax_dict['X'], hs, ls, loc=(0, 0), fontsize=11.9)
 
     plt.savefig(f'plots/connectomes_and_similarity_{matrix_shape}.pdf')
 
@@ -585,9 +566,8 @@ def calculate_dropoff(
     plot_legend(ax_dict['X'], hs, ls)
     plt.savefig(f'plots/{savename}.png', dpi=600, bbox_inches='tight')
 
-
-for matrix_shape in ['square', 'rectangular']:
+for matrix_shape in ['rectangular']:
     plot_connectome_similarity(connectome_dict[matrix_shape], matrix_shape, xlims[matrix_shape])
-    plot_p_values_reduced(calc_p_values(matrix_shape), matrix_shape)
+    # plot_p_values_reduced(calc_p_values(matrix_shape), matrix_shape)
 
-# calculate_dropoff(max_change_fraction=0.1, step_size=0.001, repetitions=5, log=True)
+# calculate_dropoff(max_change_fraction=0.1, step_size=0.005, repetitions=10, log=True)
