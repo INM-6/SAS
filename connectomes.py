@@ -21,6 +21,7 @@ mpl.rcParams['pdf.fonttype'] = 42
 sns.set(font='Avenir', style="ticks")
 
 networks = ['ER', 'DCM', 'one_cluster', 'two_clusters', 'WS', 'BA', 'one_cluster_shuffled', 'two_clusters_shuffled']
+networks_without_shuffle = ['ER', 'DCM', 'one_cluster', 'two_clusters', 'WS', 'BA']
 
 
 def clustered_connectome(size, clusters, rel_cluster_weights, mean_connection_prob):
@@ -115,6 +116,7 @@ size_square = (300, 300)
 size_rectangular = (450, 200)
 mean_connection_prob = 0.1
 shuffle_ = True
+repetitions = 100
 
 mean_num_connections_square = mean_connection_prob * size_square[0] * size_square[1]
 mean_num_connections_rectangular = mean_connection_prob * size_rectangular[0] * size_rectangular[1]
@@ -171,6 +173,7 @@ titles = {
 
 score_name = 'scores'
 
+# 100 vs 100
 try:
     scores = np.load(f'{score_name}.npy', allow_pickle=True).item()
     print('Scores found on disk. Continuing...')
@@ -180,14 +183,51 @@ except FileNotFoundError:
     for matrix_shape, connectomes in connectome_dict.items():
         scores[matrix_shape] = {}
         for rule_1, rule_2 in combinations_with_replacement(connectomes.keys(), 2):
-            score = singular_angles.similarity(connectomes[rule_1], connectomes[rule_2])
+            score = singular_angles.similarity(connectomes[rule_1], connectomes[rule_2],
+                                               repetitions=repetitions)
             scores[matrix_shape][f'{rule_1}-{rule_2}'] = score
             print(f"The similarity of {rule_1} and {rule_2} is {np.round(np.mean(score), 2)} ± "
                   f"{np.round(np.std(score), 2)}")
     np.save(f'{score_name}.npy', scores)
 
+# 1 vs 100
+try:
+    scores_GT = np.load(f'{score_name}_GT.npy', allow_pickle=True).item()
+    print('Scores (GT) found on disk. Continuing...')
+except FileNotFoundError:
+    print('Scores (GT) not found on disk. Calculating...')
+    scores_GT = {}
+    for matrix_shape, connectomes in connectome_dict.items():
+        scores_GT[matrix_shape] = {}
+        for rule_1, rule_2 in product(connectomes.keys(), connectomes.keys()):
+            score = singular_angles.similarity(connectomes[rule_1], connectomes[rule_2],
+                                               repetitions=repetitions, repeat_a=True)
+            scores_GT[matrix_shape][f'{rule_1}-{rule_2}'] = score
+            print(f"The similarity of {rule_1} and {rule_2} is {np.round(np.mean(score), 2)} ± "
+                  f"{np.round(np.std(score), 2)}")
+    np.save(f'{score_name}_GT.npy', scores_GT)
 
-def calc_p_values(matrix_shape):
+# 1 vs x
+GT_increase = 'ER'
+increase = np.arange(3, 100, 5)
+try:
+    scores_GT_increase = np.load(f'{score_name}_GT_increase.npy', allow_pickle=True).item()
+    print('Scores (GT increase) found on disk. Continuing...')
+except FileNotFoundError:
+    print('Scores (GT increase) not found on disk. Calculating...')
+    scores_GT_increase = {}
+    for matrix_shape, connectomes in connectome_dict.items():
+        scores_GT_increase[matrix_shape] = {}
+        for rule_2 in connectomes.keys():
+            scores_GT_increase[matrix_shape][f'{GT_increase}-{rule_2}'] = np.empty(len(increase), dtype=object)
+            for i, incrs in enumerate(increase):
+                scores_GT_increase[matrix_shape][f'{GT_increase}-{rule_2}'][i] = singular_angles.similarity(
+                    connectomes[GT_increase], connectomes[rule_2], repetitions=incrs, repeat_a=True)
+            print(f'calculated {GT_increase}-{rule_2}')
+    np.save(f'{score_name}_GT_increase.npy', scores_GT_increase)
+
+
+def calc_p_values(scores):
     # calculate p values between distributions
     comparisons = []
     for i, network_i in enumerate(networks):
@@ -268,38 +308,31 @@ def plot_connectome_similarity(connectomes, matrix_shape, xlims):
 
     if matrix_shape == 'square':
         mosaic = """
-            AAABBB.GGGGX
-            AAABBB.GGGGX
-            AAABBB.GGGGX
-            CCCDDD.GGGGX
-            CCCDDD.GGGGX
-            CCCDDD.GGGGX
-            EEEFFF.GGGGX
-            EEEFFF.GGGGX
-            EEEFFF.GGGGX
+            AAAaaa.BBBbbb
+            AAAaaa.BBBbbb
+            AAAaaa.BBBbbb
+            CCCccc.DDDddd
+            CCCccc.DDDddd
+            CCCccc.DDDddd
+            EEEeee.FFFfff
+            EEEeee.FFFfff
+            EEEeee.FFFfff
             """
         fig = plt.figure(figsize=(15, 10), layout="constrained", dpi=1200)
         connectome_titles = titles
     elif matrix_shape == 'rectangular':
         mosaic = """
-            AABB.GGGGGGX
-            AABB.GGGGGGX
-            AABB.GGGGGGX
-            AABB.GGGGGGX
-            .....GGGGGGX
-            .....GGGGGGX
-            CCDD.GGGGGGX
-            CCDD.GGGGGGX
-            CCDD.GGGGGGX
-            CCDD.GGGGGGX
-            .....GGGGGGX
-            .....GGGGGGX
-            EEFF.GGGGGGX
-            EEFF.GGGGGGX
-            EEFF.GGGGGGX
-            EEFF.GGGGGGX
+            AAAaaa.BBBbbb
+            AAAaaa.BBBbbb
+            AAAaaa.BBBbbb
+            CCCccc.DDDddd
+            CCCccc.DDDddd
+            CCCccc.DDDddd
+            EEEeee.FFFfff
+            EEEeee.FFFfff
+            EEEeee.FFFfff
             """
-        fig = plt.figure(figsize=(15, 12), layout="constrained", dpi=1200)
+        fig = plt.figure(figsize=(11, 10), layout="constrained", dpi=1200)
         connectome_titles = labels
     ax_dict = fig.subplot_mosaic(mosaic)
 
@@ -340,45 +373,25 @@ def plot_connectome_similarity(connectomes, matrix_shape, xlims):
                          cmap=colormap(colors['BA']))
     ax.text(-0.1, 1.15, 'F', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
-    ax = ax_dict['G']
-    # ax.text(-0.1, 1.1, ' ', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
-    ax.text(-0.05, 1.02, 'G', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
-    ax.set_yticks([])
-    ax.set_xticks([])
-    ax.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
-    num_plots = len(list(colors_comparisons.keys()))
-    hs, ls = [], []
-    for i, (comparison, color) in enumerate(colors_comparisons.items()):
-        axin = ax.inset_axes([0, 1 - (1 / num_plots) * (i + 1), 1, 1 / (num_plots * 0.9)])
-        axin.set_yticks([])
-        rect = axin.patch
-        rect.set_alpha(0)
-        if i != num_plots - 1:
-            axin.set_xticks([])
-            axin.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
-        else:
-            axin.spines[['right', 'top', 'left']].set_visible(False)
-            axin.set_xlabel('similarity')
-        hist = axin.hist(scores[matrix_shape][comparison], density=True, color=color[1], edgecolor=color[0],
-                         linewidth=1.5, histtype="stepfilled",
-                         label=f"{labels[comparison.split('-')[0]]} - {labels[comparison.split('-')[1]]}")
-        x = np.linspace(xlims[0][0], hist[1][0])
-        axin.plot(x, np.zeros_like(x), color=color[0], linewidth=1.5)
-        x = np.linspace(hist[1][-1], xlims[0][1])
-        axin.plot(x, np.zeros_like(x), color=color[0], linewidth=1.5)
-        axin.set_xlim(xlims[0])
-        hs_, ls_ = axin.get_legend_handles_labels()
-        hs += hs_
-        ls += ls_
-    if matrix_shape == 'square':
-        plot_legend(ax_dict['X'], hs, ls, loc=(0, 0), fontsize=11.37)
-    elif matrix_shape == 'rectangular':
-        plot_legend(ax_dict['X'], hs, ls, loc=(0, 0), fontsize=11.9)
+    for GT, axid in zip(networks_without_shuffle, ['a', 'b', 'c', 'd', 'e', 'f']):
+        ax = ax_dict[axid]
+        ax.text(-0.1, 1.15, axid, transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
 
+        ax.hist(scores[matrix_shape][f'{GT}-{GT}'], density=True, edgecolor=colors[GT], color=colors[GT],
+                histtype="stepfilled", linewidth=1.5)
+        for network in networks_without_shuffle:
+            if network != GT:
+                try:
+                    score = scores[matrix_shape][f'{GT}-{network}']
+                except KeyError:
+                    score = scores[matrix_shape][f'{network}-{GT}']
+                ax.hist(score, density=True, edgecolor=colors[network], histtype="step", linewidth=3)
+        ax.set_ylabel('occurrence')
+        ax.set_xlabel('similarity')
     plt.savefig(f'plots/connectomes_and_similarity_{matrix_shape}.pdf')
 
 
-def plot_p_values_reduced(p_values, matrix_shape):
+def plot_p_values_reduced(p_values, scores, matrix_shape, savename):
 
     p_values_reduced = np.zeros((len(networks), len(networks)))
     score_labels = np.empty((len(networks), len(networks), 2), dtype=object)
@@ -408,14 +421,14 @@ def plot_p_values_reduced(p_values, matrix_shape):
     newnorm = TwoSlopeNorm(vmin=-50, vcenter=sig_alpha, vmax=0)
 
     mosaic = """
-        AAAAAAAAAAAAAA.B
+        AAAAAAAAAAAAAAAAAA.B
         """
     fig = plt.figure(figsize=(9, 8), layout="constrained")
     ax_dict = fig.subplot_mosaic(mosaic)
 
     # Plot color mesh
     ax = ax_dict['A']
-    ax.pcolormesh(np.log10(p_values_reduced), cmap=newcmp, norm=newnorm)
+    ax.pcolormesh(np.log10(p_values_reduced), cmap=newcmp, norm=newnorm, edgecolor='white')
     # Add text
     for x in range(n):
         for y in range(n):
@@ -432,15 +445,15 @@ def plot_p_values_reduced(p_values, matrix_shape):
             # except ValueError:
             #     pass
 
-            ax.text(x + 0.8, y + 0.8, s=f"{np.round(np.mean(scores[matrix_shape][score_labels[x, y, 1]]), 3)}",
+            ax.text(x + 0.65, y + 0.65, s=f"{np.round(np.mean(scores[matrix_shape][score_labels[x, y, 1]]), 3)}",
                     va='center', ha='center', color='white', fontsize=7)
-            ax.text(x + 0.2, y + 0.2, s=f"{np.round(np.mean(scores[matrix_shape][score_labels[x, y, 0]]), 3)}",
+            ax.text(x + 0.35, y + 0.35, s=f"{np.round(np.mean(scores[matrix_shape][score_labels[x, y, 0]]), 3)}",
                     va='center', ha='center', color='white', fontsize=7)
 
     # Add white lines around each entry
     ax.set_xticks(np.arange(0, n + 1, step=0.5), minor=True)
     ax.set_yticks(np.arange(0, n + 1, step=0.5), minor=True)
-    ax.grid(which='minor', color='white', linestyle='-', linewidth=0.5)
+    # ax.grid(visible=True, which='minor', color='white', linestyle='-', linewidth=3)
     ax.tick_params(which="minor", bottom=False, left=False)
     # Format ticks
     ax.set_xticks(np.arange(0.5, n))
@@ -467,7 +480,7 @@ def plot_p_values_reduced(p_values, matrix_shape):
     cb.ax.set_xlabel('log of p-value')
     # cb.ax.set_xlim(-21, -0.1)
 
-    plt.savefig(f'plots/p_values_reduced_{matrix_shape}.pdf')
+    plt.savefig(f'plots/{savename}.pdf')
 
 
 xlims = {
@@ -489,6 +502,7 @@ def change_matrix(base_matrix_template, max_change_fraction=0.1, step_size=0.01,
     similarity_mean = []
     similarity_std = []
     for change in np.arange(max_changes + 1, step=size * step_size).astype(int):
+    for change in np.insert(np.arange(max_changes + 1, step=size * step_size).astype(int), 1, np.arange(1, 100, step=10)):
         similarity = []
         for rep in range(repetitions):
             changed_matrix = base_matrix.copy()
@@ -566,8 +580,28 @@ def calculate_dropoff(
     plot_legend(ax_dict['X'], hs, ls)
     plt.savefig(f'plots/{savename}.png', dpi=600, bbox_inches='tight')
 
-for matrix_shape in ['rectangular']:
-    plot_connectome_similarity(connectome_dict[matrix_shape], matrix_shape, xlims[matrix_shape])
-    # plot_p_values_reduced(calc_p_values(matrix_shape), matrix_shape)
 
-# calculate_dropoff(max_change_fraction=0.1, step_size=0.005, repetitions=10, log=True)
+def plot_p_increase(scores, savename):
+    fig, ax = plt.subplots()
+    for network in networks_without_shuffle:
+        scores_arr = scores[f'{GT_increase}-{network}']
+        mean, std = np.empty(len(scores_arr)), np.empty(len(scores_arr))
+        for i, obj in enumerate(scores_arr):
+            mean[i] = np.mean(obj)
+            std[i] = np.std(obj)
+        ax.plot(increase, mean, color=colors[network])
+        ax.fill_between(increase, mean - std, mean + std, color=colors[network], alpha=0.5)
+    ax.set_xlabel('number of draws')
+    ax.set_ylabel('similarity')
+    plt.savefig(f'plots/{savename}.pdf')
+
+
+# for matrix_shape in ['square', 'rectangular']:
+    # plot_connectome_similarity(connectome_dict[matrix_shape], matrix_shape, xlims[matrix_shape])
+    # plot_p_values_reduced(calc_p_values(scores=scores[matrix_shape]), scores=scores,
+    #                       matrix_shape=matrix_shape, savename=f'p_values_reduced_{matrix_shape}')
+    # plot_p_values_reduced(calc_p_values(scores=scores_GT[matrix_shape]), scores=scores_GT,
+    #                       matrix_shape=matrix_shape, savename=f'p_values_reduced_{matrix_shape}_GT')
+    # plot_p_increase(scores_GT_increase[matrix_shape], savename=f'p_value_increase_{matrix_shape}')
+
+calculate_dropoff(max_change_fraction=0.1, step_size=0.005, repetitions=10, log=True)
