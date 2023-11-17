@@ -114,7 +114,8 @@ class SingularAngles():
 
         return angle
 
-    def similarity(self, matrix_a, matrix_b, repetitions=100, repeat_a=False, repeat_b=False):
+    def similarity(self, matrix_a, matrix_b, repetitions=100, repeat_a=False, repeat_b=False,
+                   method_a=rd.poisson, method_b=rd.poisson):
         """
         Draws samples from two matrices and computes their similarity scores.
 
@@ -136,8 +137,8 @@ class SingularAngles():
         list
             List of similarity scores between the samples of the input matrices.
         """
-        draw_a = self.draw(matrix_a, repetitions=repetitions, repeat=repeat_a)
-        draw_b = self.draw(matrix_b, repetitions=repetitions, repeat=repeat_b)
+        draw_a = self.draw(matrix_a, repetitions=repetitions, repeat=repeat_a, method=method_a)
+        draw_b = self.draw(matrix_b, repetitions=repetitions, repeat=repeat_b, method=method_b)
         return [self.compare(d_a, d_b) for d_a, d_b in zip(draw_a, draw_b)]
 
     def draw(self, matrix, repetitions=100, repeat=False, method=rd.poisson):
@@ -160,10 +161,13 @@ class SingularAngles():
         list
             List of drawn samples.
         """
-        if repeat:
+        if method == 'identity':
             return [matrix] * repetitions
         else:
-            return [method(matrix) for i in range(repetitions)]
+            if repeat:
+                return [method(matrix)] * repetitions
+            else:
+                return [method(matrix) for i in range(repetitions)]
 
     def effect_size(self, dist_a, dist_b):
         """
