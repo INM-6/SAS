@@ -114,33 +114,6 @@ class SingularAngles():
 
         return angle
 
-    def similarity(self, matrix_a, matrix_b, repetitions=100, repeat_a=False, repeat_b=False,
-                   method_a=rd.poisson, method_b=rd.poisson):
-        """
-        Draws samples from two matrices and computes their similarity scores.
-
-        Parameters
-        ----------
-        matrix_a : ndarray
-            First input matrix.
-        matrix_b : ndarray
-            Second input matrix.
-        repetitions : int, optional
-            Number of times to draw samples, by default 100.
-        repeat_a : bool, optional
-            If True, repeats the matrix instead of drawing from it; by default False.
-        repeat_b : bool, optional
-            If True, repeats the matrix instead of drawing from it; by default False.
-
-        Returns
-        -------
-        list
-            List of similarity scores between the samples of the input matrices.
-        """
-        draw_a = self.draw(matrix_a, repetitions=repetitions, repeat=repeat_a, method=method_a)
-        draw_b = self.draw(matrix_b, repetitions=repetitions, repeat=repeat_b, method=method_b)
-        return [self.compare(d_a, d_b) for d_a, d_b in zip(draw_a, draw_b)]
-
     def draw(self, matrix, repetitions=100, repeat=False, method=rd.poisson):
         """
         Draws samples from the given matrix using a specific method.
