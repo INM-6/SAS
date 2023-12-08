@@ -74,22 +74,33 @@ class Connectomes(SingularAngles):
             self.indegrees = {}
             self.outdegrees = {}
 
+        self.deleted_source_ids = {}
+
     def clustered_connectome(self, size, clusters, rel_cluster_weights):
-        mean_num_connections = self.params['mean_connection_prob'] * size[0] * size[1]
-        connectome = np.ones(size)
+        max_size = np.max(size)
+        mean_num_connections = self.params['mean_connection_prob'] * max_size * max_size
+        connectome = np.ones((max_size, max_size))
         for cluster, rel_cluster_weight in zip(clusters, rel_cluster_weights):
             connectome[cluster[0]:cluster[1], :][:, cluster[0]:cluster[1]] = rel_cluster_weight
         connectome = connectome / (np.sum(connectome) / mean_num_connections)
+        matrix = (np.random.random((max_size, max_size)) < connectome).astype(int)
 
-        graph = (np.random.random(size) < connectome).astype(int)
-        return graph
+        if size[0] != size[1]:
+            matrix = self._rectangularize(matrix, size)
+        return matrix
 
     def erdos_renyi(self, size):
-        return (np.random.random(size) < (np.ones(size) * self.params['mean_connection_prob'])).astype(int)
+        max_size = np.max(size)
+        matrix = (np.random.random((max_size, max_size))
+                  < (np.ones(max_size, max_size) * self.params['mean_connection_prob'])).astype(int)
+
+        if size[0] != size[1]:
+            matrix = self._rectangularize(matrix, size)
+        return matrix
 
     def directed_configuration_model(self, size):
-
-        total_connections = int(self.params['mean_connection_prob'] * size[0] * size[1])
+        max_size = np.max(size)
+        total_connections = int(self.params['mean_connection_prob'] * max_size * max_size)
 
         def calc_degrees(length, total_connections):
             connections = np.ones(total_connections)
@@ -97,12 +108,12 @@ class Connectomes(SingularAngles):
             np.add.at(degrees, np.random.choice(range(length), total_connections, replace=True), connections)
             return degrees.astype(int)
 
-        if (size not in self.indegrees.keys()) and (size not in self.outdegrees.keys()):
-            self.indegrees[size] = calc_degrees(size[0], total_connections)
-            self.outdegrees[size] = calc_degrees(size[1], total_connections)
+        if (max_size not in self.indegrees.keys()) and (max_size not in self.outdegrees.keys()):
+            self.indegrees[max_size] = calc_degrees(max_size, total_connections)
+            self.outdegrees[max_size] = calc_degrees(max_size, total_connections)
 
         graph = nx.directed_configuration_model(
-            in_degree_sequence=self.indegrees[size], out_degree_sequence=self.outdegrees[size])
+            in_degree_sequence=self.indegrees[max_size], out_degree_sequence=self.outdegrees[max_size])
         graph.remove_edges_from(nx.selfloop_edges(graph))
         while graph.number_of_edges() < total_connections:
             nodes = np.random.choice(graph.nodes(), size=2, replace=False)
@@ -110,21 +121,24 @@ class Connectomes(SingularAngles):
         while graph.number_of_edges() > total_connections:
             edge = np.random.choice(graph.edges())
             graph.remove_edge(*edge)
-        graph = nx.to_numpy_array(graph).T[:size[0], :size[1]]
+        matrix = nx.to_numpy_array(graph)
 
-        return graph
+        if size[0] != size[1]:
+            matrix = self._rectangularize(matrix, size)
+        return matrix
 
     def watts_strogatz(self, size, p):
-        graph = nx.watts_strogatz_graph(np.maximum(size[0], size[1]), k=int(
-            self.params['mean_connection_prob'] * (np.maximum(size[0], size[1]) - 1)), p=p)
+        max_size = np.max(size)
+        graph = nx.watts_strogatz_graph(max_size, k=int(self.params['mean_connection_prob'] * (max_size - 1)),
+                                        p=p)
         matrix = nx.to_numpy_array(graph).T
         if size[0] != size[1]:
             matrix = self._rectangularize(matrix, size)
         return matrix
 
     def barabasi_albert(self, size):
-        graph = nx.barabasi_albert_graph(np.maximum(size[0], size[1]), m=int(
-            self.params['mean_connection_prob'] * (np.maximum(size[0], size[1]) - 1) / 2))
+        max_size = np.max(size)
+        graph = nx.barabasi_albert_graph(max_size, m=int(self.params['mean_connection_prob'] * (max_size - 1) / 2))
         matrix = nx.to_numpy_array(graph).T
         if size[0] != size[1]:
             matrix = self._rectangularize(matrix, size)
@@ -137,11 +151,13 @@ class Connectomes(SingularAngles):
         return flat_matrix.reshape(n, m)
 
     def _rectangularize(self, matrix, size):
-        random_choice = np.random.choice(np.maximum(size[0], size[1]), size=np.minimum(size[0], size[1]), replace=False)
-        if size[0] < size[1]:
-            matrix = matrix[random_choice, :]
-        else:
-            matrix = matrix[:, random_choice]
+        try:
+            random_choice = self.deleted_source_ids[size]
+        except KeyError:
+            random_choice = np.sort(np.random.choice(np.maximum(size[0], size[1]),
+                                                     size=np.minimum(size[0], size[1]), replace=False))
+            self.deleted_source_ids[size] = random_choice
+        matrix = matrix[:, random_choice]
         return matrix
 
     # plotting
@@ -151,8 +167,8 @@ class Connectomes(SingularAngles):
             fig, ax = plt.subplots()
         im = ax.imshow(connectome, cmap=cmap, vmin=0, vmax=np.max(connectome))
         cbar = fig.colorbar(im, ax=ax)
-        ax.set_xlabel('pre-synaptic neuron')
-        ax.set_ylabel('post-synaptic neuron')
+        ax.set_xlabel('source node')
+        ax.set_ylabel('target node')
         ax.set_title(title)
         cbar.ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
         if save:
@@ -598,37 +614,37 @@ class Connectomes(SingularAngles):
             np.save(f'{score_name}_{matrix_shape}.npy', scores)
 
         # 1 vs 100
-        try:
-            scores_GT = np.load(f'{score_name}_GT_{matrix_shape}.npy', allow_pickle=True).item()
-            print('Scores (GT) found on disk. Continuing...')
-        except FileNotFoundError:
-            print('Scores (GT) not found on disk. Calculating...')
-            scores_GT = {}
-            for rule_1, rule_2 in product(self.networks, self.networks):
-                connectome_1 = self.draw(rule_1, matrix_shape)
-                score = [self.compare(connectome_1, self.draw(rule_2, matrix_shape)) for _ in range(repetitions)]
-                scores_GT[f'{rule_1}-{rule_2}'] = score
-                print(f"The similarity of {rule_1} and {rule_2} is {np.round(np.mean(score), 2)} ± "
-                      f"{np.round(np.std(score), 2)}")
-            np.save(f'{score_name}_GT_{matrix_shape}.npy', scores_GT)
+        # try:
+        #     scores_GT = np.load(f'{score_name}_GT_{matrix_shape}.npy', allow_pickle=True).item()
+        #     print('Scores (GT) found on disk. Continuing...')
+        # except FileNotFoundError:
+        #     print('Scores (GT) not found on disk. Calculating...')
+        #     scores_GT = {}
+        #     for rule_1, rule_2 in product(self.networks, self.networks):
+        #         connectome_1 = self.draw(rule_1, matrix_shape)
+        #         score = [self.compare(connectome_1, self.draw(rule_2, matrix_shape)) for _ in range(repetitions)]
+        #         scores_GT[f'{rule_1}-{rule_2}'] = score
+        #         print(f"The similarity of {rule_1} and {rule_2} is {np.round(np.mean(score), 2)} ± "
+        #               f"{np.round(np.std(score), 2)}")
+        #     np.save(f'{score_name}_GT_{matrix_shape}.npy', scores_GT)
 
         # 1 vs x
-        try:
-            scores_GT_increase = np.load(f'{score_name}_GT_increase_{matrix_shape}.npy', allow_pickle=True).item()
-            print('Scores (GT increase) found on disk. Continuing...')
-        except FileNotFoundError:
-            print('Scores (GT increase) not found on disk. Calculating...')
-            connectome_GT = self.draw(GT_increase, matrix_shape)
-            scores_GT_increase = {}
-            for rule_2 in self.networks:
-                scores_GT_increase[f'{GT_increase}-{rule_2}'] = np.empty(len(increase), dtype=object)
-                for i, incrs in enumerate(increase):
-                    scores_GT_increase[f'{GT_increase}-{rule_2}'][i] = [
-                        self.compare(connectome_GT, self.draw(rule_2, matrix_shape)) for _ in range(incrs)]
-                print(f'calculated {GT_increase}-{rule_2}')
-            np.save(f'{score_name}_GT_increase_{matrix_shape}.npy', scores_GT_increase)
+        # try:
+        #     scores_GT_increase = np.load(f'{score_name}_GT_increase_{matrix_shape}.npy', allow_pickle=True).item()
+        #     print('Scores (GT increase) found on disk. Continuing...')
+        # except FileNotFoundError:
+        #     print('Scores (GT increase) not found on disk. Calculating...')
+        #     connectome_GT = self.draw(GT_increase, matrix_shape)
+        #     scores_GT_increase = {}
+        #     for rule_2 in self.networks:
+        #         scores_GT_increase[f'{GT_increase}-{rule_2}'] = np.empty(len(increase), dtype=object)
+        #         for i, incrs in enumerate(increase):
+        #             scores_GT_increase[f'{GT_increase}-{rule_2}'][i] = [
+        #                 self.compare(connectome_GT, self.draw(rule_2, matrix_shape)) for _ in range(incrs)]
+        #         print(f'calculated {GT_increase}-{rule_2}')
+        #     np.save(f'{score_name}_GT_increase_{matrix_shape}.npy', scores_GT_increase)
 
-        return scores, scores_GT, scores_GT_increase
+        return scores  # , scores_GT, scores_GT_increase
 
 
 if __name__ == '__main__':
@@ -651,17 +667,17 @@ if __name__ == '__main__':
     os.makedirs('plots', exist_ok=True)
 
     for matrix_shape in ['square', 'rectangular']:
-        scores, scores_GT, scores_GT_increase = connectomes.compare_networks(matrix_shape)
+        scores = connectomes.compare_networks(matrix_shape)
         p_values, effect_sizes = connectomes.calc_statistics(scores)
-        p_values_GT, effect_sizes_GT = connectomes.calc_statistics(scores_GT)
+        # p_values_GT, effect_sizes_GT = connectomes.calc_statistics(scores_GT)
 
-        # connectomes.plot_connectome_similarity(scores, matrix_shape)
+        connectomes.plot_connectome_similarity(scores, matrix_shape)
         # connectomes.plot_p_values_reduced(p_values, scores,
         #                                   matrix_shape, savename=f'p_values_reduced_{matrix_shape}')
         # connectomes.plot_p_values_reduced(p_values_GT, scores_GT,
         #                                   matrix_shape, savename=f'p_values_reduced_{matrix_shape}_GT')
-        # connectomes.plot_effect_sizes(effect_sizes, scores, matrix_shape,
-        #                               savename=f'effect_sizes_reduced_{matrix_shape}')
+        connectomes.plot_effect_sizes(effect_sizes, scores, matrix_shape,
+                                      savename=f'effect_sizes_reduced_{matrix_shape}')
         # connectomes.plot_effect_sizes(effect_sizes_GT, scores_GT, matrix_shape,
         #                               savename=f'effect_sizes_reduced_{matrix_shape}_GT')
         # connectomes.plot_p_increase(scores_GT_increase, savename=f'p_value_increase_{matrix_shape}')
