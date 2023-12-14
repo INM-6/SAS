@@ -1,12 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-import matplotlib.colors as mcolors
-from matplotlib import cm
 from matplotlib.colors import ListedColormap
-from matplotlib.colors import TwoSlopeNorm
-import seaborn as sns
-import matplotlib as mpl
 from itertools import product, combinations, combinations_with_replacement
 from singular_angles import SingularAngles
 import os
@@ -15,10 +10,12 @@ import random
 from scipy import stats
 import xarray as xr
 
-
 # set fonttype so Avenir can be used with pdf format
-mpl.rcParams['pdf.fonttype'] = 42
-sns.set(font='Avenir', style="ticks")
+# mpl.rcParams['pdf.fonttype'] = 42
+plt.rcParams['font.family'] = 'Avenir'
+plt.rcParams['xtick.labelsize'] = 13  # Adjust x-axis tick label size
+plt.rcParams['ytick.labelsize'] = 13  # Adjust y-axis tick label size
+plt.rcParams['axes.labelsize'] = 15  # Adjust x and y-axis label size
 
 
 class Connectomes(SingularAngles):
@@ -30,27 +27,22 @@ class Connectomes(SingularAngles):
         self.params = network_params
 
         self.networks = ['ER', 'DCM', '1C', '2C', 'WS', 'BA']
-        self.networks_without_shuffle = [n for n in self.networks if 's' not in n]
         self.matrix_shapes = ['square', 'rectangular']
 
         self.titles = {
             'ER': 'Erdős-Rényi',
-            'DCM': 'directed configuration model',
-            '1C': 'one cluster',
-            '2C': 'two clusters',
-            '1Cs': 'one cluster - shuffled',
-            '2Cs': 'two clusters - shuffled',
+            'DCM': 'Directed configuration model',
+            '1C': 'One cluster',
+            '2C': 'Two clusters',
             'WS': 'Watts-Strogatz',
             'BA': 'Barabasi-Albert',
         }
 
         self.colors = {
-            'ER': '#332288',
+            'ER': '#6151AC',
             'DCM': '#88CCEE',
             '1C': '#44AA99',
-            '1Cs': '#999933',
             '2C': '#CC6677',
-            '2Cs': '#882255',
             'WS': '#DDCC77',
             'BA': '#EE8866',
         }
@@ -58,10 +50,8 @@ class Connectomes(SingularAngles):
         self.labels = {
             'ER': 'ER',
             'DCM': 'DCM',
-            '1C': '1C',
-            '2C': '2C',
-            '1Cs': '1Cs',
-            '2Cs': '2Cs',
+            '1C': 'OC',
+            '2C': 'TC',
             'WS': 'WS',
             'BA': 'BA',
         }
@@ -162,15 +152,16 @@ class Connectomes(SingularAngles):
 
     # plotting
 
-    def plot_connectome(self, connectome, name, title, fig=None, ax=None, save=True, cmap='Greens'):
+    def plot_connectome(self, connectome, name, title, fig=None, ax=None, save=True, cmap='Greens', extend='neither'):
         if (fig is None) and (ax is None):
             fig, ax = plt.subplots()
-        im = ax.imshow(connectome, cmap=cmap, vmin=0, vmax=np.max(connectome))
-        cbar = fig.colorbar(im, ax=ax)
-        ax.set_xlabel('source node')
-        ax.set_ylabel('target node')
+        im = ax.imshow(connectome, cmap=cmap, vmin=0, vmax=1)
+        cbar = fig.colorbar(im, ax=ax, ticks=[0.25, 0.75], extend=extend)
+        cbar.set_ticklabels(['0', '1'])
+        ax.set_xlabel('Source node')
+        ax.set_ylabel('Target node')
         ax.set_title(title)
-        cbar.ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+        # cbar.ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
         if save:
             plt.savefig(f'plots/{name}.png', dpi=600)
         return ax
@@ -188,7 +179,7 @@ class Connectomes(SingularAngles):
             coords={'comparison_0': comparisons, 'comparison_1': comparisons},
             dims=['comparison_0', 'comparison_1'])
         effect_sizes = xr.DataArray(
-            dummy_data_array,
+            dummy_data_array.copy(),
             coords={'comparison_0': comparisons, 'comparison_1': comparisons},
             dims=['comparison_0', 'comparison_1'])
 
@@ -213,14 +204,12 @@ class Connectomes(SingularAngles):
                                            + np.std(scores[meta_comparisons[1]])**2) / 2)))
                 p_values.loc[meta_comparisons[0], meta_comparisons[1]] = p_value
                 effect_sizes.loc[meta_comparisons[0], meta_comparisons[1]] = effect_size
-
         return p_values, effect_sizes
 
     # ------- PLOT SIMILARITY SCORES AND P VALUES FOR CONNECTOMES -------
 
     def colormap(self, base_color):
-        cmap = mcolors.LinearSegmentedColormap.from_list(
-            'custom_colormap', ['#FFFFFF', base_color])
+        cmap = ListedColormap(['#FFFFFF', base_color])
         return cmap
 
     def plot_legend(self, ax, hs, ls, loc=(0.1, 0.1), fontsize=9):
@@ -230,50 +219,45 @@ class Connectomes(SingularAngles):
         ax.set_yticks([])
         ax.legend(hs, ls, frameon=False, loc=loc, ncol=1, fontsize=fontsize)
 
-    def plot_connectome_similarity(self, scores, matrix_shape):
+    def plot_connectome_similarity(self, scores, effect_sizes, p_values, matrix_shape):
 
+        mosaic = """
+            AAAAAaaaaaU.BBBBBbbbbbV.
+            AAAAAaaaaaU.BBBBBbbbbbV.
+            AAAAAaaaaaU.BBBBBbbbbbV.
+            AAAAAaaaaaU.BBBBBbbbbbV.
+            AAAAAaaaaaU.BBBBBbbbbbV.
+            CCCCCcccccW.DDDDDdddddX.
+            CCCCCcccccW.DDDDDdddddX.
+            CCCCCcccccW.DDDDDdddddX.
+            CCCCCcccccW.DDDDDdddddX.
+            CCCCCcccccW.DDDDDdddddX.
+            EEEEEeeeeeY.FFFFFfffffZ.
+            EEEEEeeeeeY.FFFFFfffffZ.
+            EEEEEeeeeeY.FFFFFfffffZ.
+            EEEEEeeeeeY.FFFFFfffffZ.
+            EEEEEeeeeeY.FFFFFfffffZ.
+            """
         if matrix_shape == 'square':
-            mosaic = """
-                AAAaaa.BBBbbb
-                AAAaaa.BBBbbb
-                AAAaaa.BBBbbb
-                CCCccc.DDDddd
-                CCCccc.DDDddd
-                CCCccc.DDDddd
-                EEEeee.FFFfff
-                EEEeee.FFFfff
-                EEEeee.FFFfff
-                """
-            fig = plt.figure(figsize=(15, 10), layout="constrained", dpi=1200)
+            fig = plt.figure(figsize=(17, 10), layout="constrained", dpi=1200)
             connectome_titles = self.titles
         elif matrix_shape == 'rectangular':
-            mosaic = """
-                AAAaaa.BBBbbb
-                AAAaaa.BBBbbb
-                AAAaaa.BBBbbb
-                CCCccc.DDDddd
-                CCCccc.DDDddd
-                CCCccc.DDDddd
-                EEEeee.FFFfff
-                EEEeee.FFFfff
-                EEEeee.FFFfff
-                """
-            fig = plt.figure(figsize=(11, 10), layout="constrained", dpi=1200)
+            fig = plt.figure(figsize=(15, 10), layout="constrained", dpi=1200)
             connectome_titles = self.labels
-        ax_dict = fig.subplot_mosaic(mosaic)
+        ax_dict = fig.subplot_mosaic(mosaic, )
 
         # --- PLOT CONNECTOMES ---
         ax = ax_dict['A']
         ax = self.plot_connectome(connectome=self.erdos_renyi(self.params['size'][matrix_shape]),
                                   name='square_ER', title=connectome_titles['ER'], fig=fig, ax=ax, save=False,
                                   cmap=self.colormap(self.colors['ER']))
-        ax.text(-0.1, 1.15, 'A', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+        ax.text(-0.1, 1.15, 'A', transform=ax.transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
 
         ax = ax_dict['B']
         ax = self.plot_connectome(connectome=self.directed_configuration_model(self.params['size'][matrix_shape]),
                                   name='square_DCM', title=connectome_titles['DCM'], fig=fig, ax=ax, save=False,
-                                  cmap=self.colormap(self.colors['DCM']))
-        ax.text(-0.1, 1.15, 'B', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+                                  cmap=self.colormap(self.colors['DCM']), extend='max')
+        ax.text(-0.1, 1.15, 'B', transform=ax.transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
 
         ax = ax_dict['C']
         ax = self.plot_connectome(connectome=self.clustered_connectome(self.params['size'][matrix_shape],
@@ -282,8 +266,7 @@ class Connectomes(SingularAngles):
                                   name='square_1C', title=connectome_titles['1C'], fig=fig, ax=ax,
                                   save=False,
                                   cmap=self.colormap(self.colors['1C']))
-        ax.text(-0.1, 1.15, 'C', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
-
+        ax.text(-0.1, 1.15, 'C', transform=ax.transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
         ax = ax_dict['D']
         ax = self.plot_connectome(connectome=self.clustered_connectome(self.params['size'][matrix_shape],
                                                                        self.params['2C']['clusters'],
@@ -291,182 +274,102 @@ class Connectomes(SingularAngles):
                                   name='square_2C', title=connectome_titles['2C'], fig=fig, ax=ax,
                                   save=False,
                                   cmap=self.colormap(self.colors['2C']))
-        ax.text(-0.1, 1.15, 'D', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+        ax.text(-0.1, 1.15, 'D', transform=ax.transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
 
         ax = ax_dict['E']
         ax = self.plot_connectome(connectome=self.watts_strogatz(self.params['size'][matrix_shape],
                                                                  p=self.params['WS']['p']),
                                   name='square_WS', title=connectome_titles['WS'], fig=fig, ax=ax, save=False,
                                   cmap=self.colormap(self.colors['WS']))
-        ax.text(-0.1, 1.15, 'E', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+        ax.text(-0.1, 1.15, 'E', transform=ax.transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
 
         ax = ax_dict['F']
         ax = self.plot_connectome(connectome=self.barabasi_albert(self.params['size'][matrix_shape]),
                                   name='square_BA', title=connectome_titles['BA'], fig=fig, ax=ax, save=False,
                                   cmap=self.colormap(self.colors['BA']))
-        ax.text(-0.1, 1.15, 'F', transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+        ax.text(-0.1, 1.15, 'F', transform=ax.transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
 
-        for GT, axid in zip(self.networks_without_shuffle, ['a', 'b', 'c', 'd', 'e', 'f']):
+        for network, axid in zip(self.networks, ['a', 'b', 'c', 'd', 'e', 'f']):
             ax = ax_dict[axid]
-            ax.text(-0.1, 1.15, axid, transform=ax.transAxes, fontsize=14, fontweight='bold', va='top', ha='left')
+            ax.text(-0.1, 1.15, axid, transform=ax.transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
 
-            ax.hist(scores[f'{GT}-{GT}'], density=True, edgecolor=self.colors[GT], color=self.colors[GT],
-                    histtype="stepfilled", linewidth=1.5)
-            for network in self.networks_without_shuffle:
-                if network != GT:
+            ax.hist(scores[f'{network}-{network}'], density=True, edgecolor=self.colors[network],
+                    color=self.colors[network], histtype="stepfilled", linewidth=1.5)
+            for n in self.networks:
+                if n != network:
                     try:
-                        score = scores[f'{GT}-{network}']
+                        score = scores[f'{network}-{n}']
                     except KeyError:
-                        score = scores[f'{network}-{GT}']
-                    ax.hist(score, density=True, edgecolor=self.colors[network], histtype="step", linewidth=3)
-            ax.set_ylabel('occurrence')
+                        score = scores[f'{n}-{network}']
+                    ax.hist(score, density=True, edgecolor=self.colors[n], histtype="step", linewidth=2.5)
+            # ax.set_ylabel('Density')
             ax.set_xlabel('SAS')
+            ax.set_yticks([])
+            ax.spines[['right', 'top', 'left']].set_visible(False)
+
+        for network, axid in zip(self.networks, ['U', 'V', 'W', 'X', 'Y', 'Z']):
+            ax = ax_dict[axid]
+            tickcolors = self.plot_statistics(effect_sizes, p_values, ax, network)
+            ax.set_xlabel(r'$\theta$')
+            for lbl, c in zip(ax.get_yticklabels(), tickcolors):
+                lbl.set_color(c)
         plt.savefig(f'plots/connectomes_and_similarity_{matrix_shape}.pdf')
 
-    def plot_p_values_reduced(self, p_values, scores, matrix_shape, savename):
+    def plot_statistics(self, effect_sizes, p_values, ax, network):
 
-        p_values_reduced = np.zeros((len(self.networks), len(self.networks)))
-        score_labels = np.empty((len(self.networks), len(self.networks), 2), dtype=object)
+        bars = []
+        p_vals = []
+        lbl = []
+        tickcolors = []
+        i = 0
+        # Create bar plot
+        for n in self.networks[::-1]:
+            if n != network:
+                try:
+                    _ = effect_sizes.loc[f'{network}-{network}', f'{network}-{n}']
+                    comparison = f'{network}-{network}', f'{network}-{n}'
+                except KeyError:
+                    comparison = f'{network}-{network}', f'{n}-{network}'
 
-        for i, GT in enumerate(self.networks):
-            comparison_1 = [f'{GT}-{n}' for n in self.networks]
-            # reorder labels of networks
-            for k in range(i):
-                comparison_1[k] = '-'.join(list(reversed(comparison_1[k].split('-'))))
-            p_values_reduced[i, :] = p_values.sel(comparison_0=[f'{n}-{n}' for n in self.networks][i],
-                                                  comparison_1=comparison_1)
-            score_labels[:, i, 0] = [f'{n}-{n}' for n in self.networks][i]
-            score_labels[:, i, 1] = comparison_1
+                bars.append(ax.barh(i, effect_sizes.loc[comparison], color=self.colors[n]))
+                p_vals.append(p_values.loc[comparison])
+                lbl.append(self.labels[n])
+                tickcolors.append(self.colors[n])
+                i += 1
 
-        np.fill_diagonal(p_values_reduced, np.nan)
+        # Set x-axis to logarithmic scale
+        # ax.set_xscale('log')
+        ax.set_xlim(-1, 5)
+        ax.set_xticks([1, 5])
+        ax.spines[['left', 'right', 'top']].set_visible(False)
+        ax.set_yticks(np.arange(len(self.networks) - 1))
+        ax.set_yticklabels(lbl)
 
-        # Define colormap for p-values
-        top = cm.get_cmap('Blues', 1000)
-        bottom = cm.get_cmap('Reds', 1000)
-        newcolors = np.vstack((top(np.linspace(0.95, 0.6, 1000)),
-                               bottom(np.linspace(0.45, 0.9, 1000))))
-        newcmp = ListedColormap(newcolors)
+        # Add vertical line at x=1
+        ax.axvline(x=0, color='black', lw=0.8)
+        ax.axvline(x=1, color='black', ls='--', lw=0.8)
 
-        n = p_values_reduced.shape[0]
-        sig = 0.05 / (n * (n - 1))
-        sig_alpha = np.log10(sig)
-        newnorm = TwoSlopeNorm(vmin=-50, vcenter=sig_alpha, vmax=0)
+        # Iterate over bars and p_values
+        for bar, p_value in zip(bars, p_vals):
+            # Check if p_value is larger or smaller than 0.05
+            if 0.01 < p_value < 0.05:
+                # Add star to the right of the bar
+                ax.annotate('*', xy=(5, bar[0].get_y() + bar[0].get_height() / 2), xytext=(3, 0),
+                            textcoords='offset points', ha='left', va='center')
+            elif 0.001 < p_value < 0.01:
+                # Add star to the right of the bar
+                ax.annotate('**', xy=(5, bar[0].get_y() + bar[0].get_height() / 2), xytext=(3, 0),
+                            textcoords='offset points', ha='left', va='center')
+            elif p_value < 0.001:
+                # Add star to the right of the bar
+                ax.annotate('***', xy=(5, bar[0].get_y() + bar[0].get_height() / 2), xytext=(3, 0),
+                            textcoords='offset points', ha='left', va='center')
+            else:
+                # Add 'n.s.' string to the right of the bar
+                ax.annotate('n.s.', xy=(5, bar[0].get_y() + bar[0].get_height() / 2), xytext=(3, 0),
+                            textcoords='offset points', ha='left', va='center')
 
-        mosaic = """
-            AAAAAAAAAAAAAAAAAA.B
-            """
-        fig = plt.figure(figsize=(9, 8), layout="constrained")
-        ax_dict = fig.subplot_mosaic(mosaic)
-
-        # Plot color mesh
-        ax = ax_dict['A']
-        ax.pcolormesh(np.log10(p_values_reduced), cmap=newcmp, norm=newnorm, edgecolor='white')
-        # Add text
-        for x in range(n):
-            for y in range(n):
-                ax.text(x + 0.65, y + 0.65, s=f"{np.round(np.mean(scores[score_labels[x, y, 1]]), 3)}",
-                        va='center', ha='center', color='white', fontsize=7)
-                ax.text(x + 0.35, y + 0.35, s=f"{np.round(np.mean(scores[score_labels[x, y, 0]]), 3)}",
-                        va='center', ha='center', color='white', fontsize=7)
-
-        # Add white lines around each entry
-        ax.set_xticks(np.arange(0, n + 1, step=0.5), minor=True)
-        ax.set_yticks(np.arange(0, n + 1, step=0.5), minor=True)
-        ax.tick_params(which="minor", bottom=False, left=False)
-        # Format ticks
-        ax.set_xticks(np.arange(0.5, n))
-        ax.set_xticklabels([])
-        ax.set_yticks(np.arange(0.5, n))
-        ax.set_yticklabels([])
-        ax.set_xticklabels([f'GT - {self.labels[n]}' for n in self.networks],
-                           rotation=45, ha='right', va='top')
-        ax.set_yticklabels([f'GT = {self.labels[n]}' for n in self.networks])
-        ax.set_ylabel('self-similarity', size=18)
-        ax.set_xlabel('cross-similarity', size=18)
-        ax.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
-        ax.set_xlim(0, n)
-        ax.set_ylim(n, 0)
-
-        # Inset for the colorbar
-        cb = mpl.colorbar.ColorbarBase(ax_dict['B'], cmap=newcmp,
-                                       norm=newnorm,
-                                       boundaries=np.arange(-51, 0.1, step=0.1),
-                                       # orientation='vertical',
-                                       ticks=[-50, -40, -30, -20, -10, sig_alpha, 0])
-        for t in cb.ax.get_xticklabels():
-            t.set_fontsize(6)
-        cb.ax.set_xlabel('log of p-value')
-        # cb.ax.set_xlim(-21, -0.1)
-
-        plt.savefig(f'plots/{savename}.pdf')
-
-    def plot_effect_sizes(self, effect_sizes, scores, matrix_shape, savename):
-
-        effect_sizes_reduced = np.zeros((len(self.networks), len(self.networks)))
-        score_labels = np.empty((len(self.networks), len(self.networks), 2), dtype=object)
-
-        for i, GT in enumerate(self.networks):
-            comparison_1 = [f'{GT}-{n}' for n in self.networks]
-            # reorder labels of networks
-            for k in range(i):
-                comparison_1[k] = '-'.join(list(reversed(comparison_1[k].split('-'))))
-            effect_sizes_reduced[i, :] = effect_sizes.sel(comparison_0=[f'{n}-{n}' for n in self.networks][i],
-                                                          comparison_1=comparison_1)
-            score_labels[:, i, 0] = [f'{n}-{n}' for n in self.networks][i]
-            score_labels[:, i, 1] = comparison_1
-
-        np.fill_diagonal(effect_sizes_reduced, np.nan)
-
-        # Define colormap for p-values
-        top = cm.get_cmap('Blues', 1000)
-        bottom = cm.get_cmap('Reds', 1000)
-        newcolors = np.vstack((top(np.linspace(0.95, 0.4, 1000)),
-                               bottom(np.linspace(0.4, 0.95, 1000))))
-        newcmp = ListedColormap(newcolors)
-
-        n = effect_sizes_reduced.shape[0]
-        newnorm = TwoSlopeNorm(vmin=-1, vcenter=1, vmax=10)
-
-        mosaic = """
-            AAAAAAAAAAAAAAAAAA.B
-            """
-        fig = plt.figure(figsize=(9, 8), layout="constrained")
-        ax_dict = fig.subplot_mosaic(mosaic)
-
-        # Plot color mesh
-        ax = ax_dict['A']
-        ax.pcolormesh(effect_sizes_reduced, cmap=newcmp, norm=newnorm, edgecolor='white')
-
-        # Add white lines around each entry
-        ax.set_xticks(np.arange(0, n + 1, step=0.5), minor=True)
-        ax.set_yticks(np.arange(0, n + 1, step=0.5), minor=True)
-        ax.tick_params(which="minor", bottom=False, left=False)
-        # Format ticks
-        ax.set_xticks(np.arange(0.5, n))
-        ax.set_xticklabels([])
-        ax.set_yticks(np.arange(0.5, n))
-        ax.set_yticklabels([])
-        ax.set_xticklabels([f'GT - {self.labels[n]}' for n in self.networks],
-                           rotation=45, ha='right', va='top')
-        ax.set_yticklabels([f'GT = {self.labels[n]}' for n in self.networks])
-        ax.set_ylabel('self-similarity', size=18)
-        ax.set_xlabel('cross-similarity', size=18)
-        ax.spines[['right', 'top', 'left', 'bottom']].set_visible(False)
-        ax.set_xlim(0, n)
-        ax.set_ylim(n, 0)
-
-        # Inset for the colorbar
-        cb = mpl.colorbar.ColorbarBase(ax_dict['B'], cmap=newcmp,
-                                       norm=newnorm,
-                                       boundaries=np.arange(-1, 10, step=0.1),
-                                       # orientation='vertical',
-                                       ticks=[-1, 0, 1, 5, 10])
-        for t in cb.ax.get_xticklabels():
-            t.set_fontsize(6)
-        cb.ax.set_xlabel('effect size')
-        # cb.ax.set_xlim(-21, -0.1)
-
-        plt.savefig(f'plots/{savename}.pdf')
+        return tickcolors
 
     # --- CALCULATE SIMILARITY FOR INCREASINGLY DIFFERENT MATRICES
 
@@ -489,9 +392,9 @@ class Connectomes(SingularAngles):
                     samples = random.sample(indices, change)
                     for coordinate in samples:
                         if changed_matrix[coordinate] == 0:
-                            changed_matrix[coordinate] += 1
+                            changed_matrix[coordinate] = 1
                         else:
-                            changed_matrix[coordinate] -= 1
+                            changed_matrix[coordinate] = 0
                 similarity.append(self.compare(base_matrix, changed_matrix))
             similarity_mean.append(np.mean(similarity))
             similarity_std.append(np.std(similarity))
@@ -512,7 +415,7 @@ class Connectomes(SingularAngles):
             log=False):
 
         mosaic = """
-            AAABBBCCCX
+            AAABBBCCC
             """
         fig = plt.figure(figsize=(int(len(sizes) * 5), 5), layout="constrained")
         ax_dict = fig.subplot_mosaic(mosaic)
@@ -542,7 +445,7 @@ class Connectomes(SingularAngles):
                 ax.plot(x, similarity_mean, color=self.colors[connectome_type], label=self.titles[connectome_type])
                 ax.fill_between(x, similarity_mean - similarity_std, similarity_mean + similarity_std, alpha=0.3,
                                 color=self.colors[connectome_type])
-                ax.set_title(f'matrix shape: {size[0]} x {size[1]}')
+                ax.set_title(f'Matrix shape: {size[0]} x {size[1]}')
             ax.set_xlabel('% of changed connections')
             ax.set_ylabel('SAS')
             ax.spines['top'].set_visible(False)
@@ -551,15 +454,15 @@ class Connectomes(SingularAngles):
                 # ax.set_xscale('log')
                 ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
                 ax.set_yscale('log')
+            ax.set_box_aspect(1)
         if log:
             savename += '_log'
-        hs, ls = ax.get_legend_handles_labels()
-        self.plot_legend(ax_dict['X'], hs, ls)
+        ax.legend(frameon=False, ncol=1, fontsize=12)
         plt.savefig(f'plots/{savename}.png', dpi=600, bbox_inches='tight')
 
     def plot_p_increase(self, scores, savename, GT_increase='ER', increase=np.arange(3, 100, 5)):
         fig, ax = plt.subplots()
-        for network in self.networks_without_shuffle:
+        for network in self.networks:
             scores_arr = scores[f'{GT_increase}-{network}']
             mean, std = np.empty(len(scores_arr)), np.empty(len(scores_arr))
             for i, obj in enumerate(scores_arr):
@@ -567,7 +470,7 @@ class Connectomes(SingularAngles):
                 std[i] = np.std(obj)
             ax.plot(increase, mean, color=self.colors[network])
             ax.fill_between(increase, mean - std, mean + std, color=self.colors[network], alpha=0.5)
-        ax.set_xlabel('number of draws')
+        ax.set_xlabel('Number of draws')
         ax.set_ylabel('SAS')
         plt.savefig(f'plots/{savename}.pdf')
 
@@ -613,38 +516,7 @@ class Connectomes(SingularAngles):
                       f"{np.round(np.std(score), 2)}")
             np.save(f'{score_name}_{matrix_shape}.npy', scores)
 
-        # 1 vs 100
-        # try:
-        #     scores_GT = np.load(f'{score_name}_GT_{matrix_shape}.npy', allow_pickle=True).item()
-        #     print('Scores (GT) found on disk. Continuing...')
-        # except FileNotFoundError:
-        #     print('Scores (GT) not found on disk. Calculating...')
-        #     scores_GT = {}
-        #     for rule_1, rule_2 in product(self.networks, self.networks):
-        #         connectome_1 = self.draw(rule_1, matrix_shape)
-        #         score = [self.compare(connectome_1, self.draw(rule_2, matrix_shape)) for _ in range(repetitions)]
-        #         scores_GT[f'{rule_1}-{rule_2}'] = score
-        #         print(f"The similarity of {rule_1} and {rule_2} is {np.round(np.mean(score), 2)} ± "
-        #               f"{np.round(np.std(score), 2)}")
-        #     np.save(f'{score_name}_GT_{matrix_shape}.npy', scores_GT)
-
-        # 1 vs x
-        # try:
-        #     scores_GT_increase = np.load(f'{score_name}_GT_increase_{matrix_shape}.npy', allow_pickle=True).item()
-        #     print('Scores (GT increase) found on disk. Continuing...')
-        # except FileNotFoundError:
-        #     print('Scores (GT increase) not found on disk. Calculating...')
-        #     connectome_GT = self.draw(GT_increase, matrix_shape)
-        #     scores_GT_increase = {}
-        #     for rule_2 in self.networks:
-        #         scores_GT_increase[f'{GT_increase}-{rule_2}'] = np.empty(len(increase), dtype=object)
-        #         for i, incrs in enumerate(increase):
-        #             scores_GT_increase[f'{GT_increase}-{rule_2}'][i] = [
-        #                 self.compare(connectome_GT, self.draw(rule_2, matrix_shape)) for _ in range(incrs)]
-        #         print(f'calculated {GT_increase}-{rule_2}')
-        #     np.save(f'{score_name}_GT_increase_{matrix_shape}.npy', scores_GT_increase)
-
-        return scores  # , scores_GT, scores_GT_increase
+        return scores
 
 
 if __name__ == '__main__':
@@ -657,7 +529,7 @@ if __name__ == '__main__':
         },
         'WS': {'p': 0.3},
         '1C': {'clusters': [(0, 50)], 'rel_cluster_weights': [10]},
-        '2C': {'clusters': [(50, 85), (85, 100)], 'rel_cluster_weights': [10, 10]},
+        '2C': {'clusters': [(0, 35), (35, 50)], 'rel_cluster_weights': [10, 10]},
     }
 
     matrix_shapes = ['square', 'rectangular']
@@ -667,19 +539,11 @@ if __name__ == '__main__':
     os.makedirs('plots', exist_ok=True)
 
     for matrix_shape in ['square', 'rectangular']:
-        scores = connectomes.compare_networks(matrix_shape)
+        scores = connectomes.compare_networks(matrix_shape, score_name='scores_overlap')
         p_values, effect_sizes = connectomes.calc_statistics(scores)
         # p_values_GT, effect_sizes_GT = connectomes.calc_statistics(scores_GT)
 
-        connectomes.plot_connectome_similarity(scores, matrix_shape)
-        # connectomes.plot_p_values_reduced(p_values, scores,
-        #                                   matrix_shape, savename=f'p_values_reduced_{matrix_shape}')
-        # connectomes.plot_p_values_reduced(p_values_GT, scores_GT,
-        #                                   matrix_shape, savename=f'p_values_reduced_{matrix_shape}_GT')
-        connectomes.plot_effect_sizes(effect_sizes, scores, matrix_shape,
-                                      savename=f'effect_sizes_reduced_{matrix_shape}')
-        # connectomes.plot_effect_sizes(effect_sizes_GT, scores_GT, matrix_shape,
-        #                               savename=f'effect_sizes_reduced_{matrix_shape}_GT')
+        connectomes.plot_connectome_similarity(scores, effect_sizes, p_values, matrix_shape)
         # connectomes.plot_p_increase(scores_GT_increase, savename=f'p_value_increase_{matrix_shape}')
 
-    connectomes.calculate_dropoff(max_change_fraction=0.1, step_size=0.005, repetitions=10, log=True)
+    # connectomes.calculate_dropoff(max_change_fraction=0.1, step_size=0.05, repetitions=2, log=True)
