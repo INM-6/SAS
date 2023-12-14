@@ -1,0 +1,171 @@
+import config
+
+wildcard_constraints:
+    seed = '\d+',
+    seed_a = '\d+',
+    seed_b = '\d+',
+    cluster_size = '[\d\.]+',
+    cluster_mean = '\d+',
+    N = '\d+',
+    M = '\d+',
+    model = 'ER|DCM|1C|2C|WS|BA'
+
+rule all:
+    input:
+        expand([\
+        'scores/scan_cluster_size.csv',
+        'scores/scan_rectangular_cluster_size.csv',
+        'scores/scan_network_size.csv',
+        'scores/scan_rectangular_network_size.csv',
+        'scores/scan_model_perturbation_{N}x{M}.csv'],
+                                N=config.default_N,
+                                M=[config.default_N, config.default_M],
+        )
+
+rule generate_clustered_matrix:
+    input:
+        script = "scripts/generate_clustered_matrix.py"
+    params:
+        mean_connection_prob = config.network_params['mean_connection_prob']
+    output:
+        output = "matrices/{N}x{M}_cluster{cluster_size}-{cluster_mean}/{seed}.npy"
+    shell:
+        """
+        python3 {input.script:q} --output {output.output:q} \
+                                 --N {wildcards.N} \
+                                 --M {wildcards.M} \
+                                 --cluster_size {wildcards.cluster_size} \
+                                 --cluster_mean {wildcards.cluster_mean} \
+                                 --mean_connection_prob {params.mean_connection_prob} \
+                                 --seed {wildcards.seed} \
+        """
+
+
+rule generate_graph_model_matrix:
+    input:
+        script = "scripts/generate_graph_model_matrices.py"
+    output:
+        output = "matrices/{N}x{M}_{model}.npy"
+    shell:
+        """
+        python3 {input.script:q} --output {output.output:q} \
+                                 --model {wildcards.model} \
+                                 --N {wildcards.N} \
+                                 --M {wildcards.M} \
+        """
+
+
+rule scan_model_perturbation:
+    input:
+        script = "scripts/compare_perturbed_matrices.py",
+        data = expand("matrices/{{N}}x{{M}}_{model}.npy", 
+                      model=config.model_names)
+    params:
+        max_change_fraction = config.max_change_fraction,
+        step_size = config.step_size,
+        repetitions = config.repetitions,
+        model_names = config.model_names
+    output:
+        output = "scores/scan_model_perturbation_{N}x{M}.csv"
+    shell:
+        """
+        python3 {input.script:q} --output {output.output:q} \
+                                 --input {input.data:q} \
+                                 --model_names {params.model_names} \
+                                 --max_change_fraction {params.max_change_fraction} \
+                                 --step_size {params.step_size} \
+                                 --repetitions {params.repetitions} \
+                                 --N {wildcards.N} \
+                                 --M {wildcards.M} \
+        """
+
+
+rule compare_clustered_matrices:
+    input:
+        script = "scripts/compare_clustered_matrices.py",
+        matrix_a = "matrices/{N}x{M}_cluster{cluster_size}-{cluster_mean}/{seed_a}.npy",
+        matrix_b = "matrices/{N}x{M}_cluster{cluster_size}-{cluster_mean}/{seed_b}.npy",
+    output:
+        output = "scores/{N}x{M}_cluster{cluster_size}-{cluster_mean}/{seed_a}-{seed_b}.csv"
+    shell:
+        """
+        python3 {input.script:q} --output {output.output:q} \
+                                 --matrix_a {input.matrix_a:q} \
+                                 --matrix_b {input.matrix_b:q} \
+                                 --N {wildcards.N} \
+                                 --M {wildcards.M} \
+                                 --cluster_size {wildcards.cluster_size} \
+                                 --cluster_mean {wildcards.cluster_mean} \
+                                 --seed_a {wildcards.seed_a} \
+                                 --seed_b {wildcards.seed_b} \
+        """
+
+
+rule scan_network_size:
+    input:
+        script = 'scripts/merge_dataframes.py',
+        data = expand("scores/{N}x{N}_cluster{cluster_size}-{cluster_mean}/{seed_pair}.csv",
+                N=config.N,
+                cluster_size=config.default_cluster_size,
+                cluster_mean=config.cluster_mean,
+                seed_pair=config.seed_pairs)
+    output:
+        output = 'scores/scan_network_size.csv'
+    shell:
+        """
+        python3 {input.script:q} --input "{input.data:q}" \
+                                 --output "{output.output:q}"
+        """
+
+
+rule scan_rectangular_network_size:
+    input:
+        script = 'scripts/merge_dataframes.py',
+        data = expand("scores/{N}x{M}_cluster{cluster_size}-{cluster_mean}/{seed_pair}.csv",
+                N=config.N,
+                M=config.default_N,
+                cluster_size=config.default_cluster_size,
+                cluster_mean=config.cluster_mean,
+                seed_pair=config.seed_pairs)
+    output:
+        output = 'scores/scan_rectangular_network_size.csv'
+    shell:
+        """
+        python3 {input.script:q} --input "{input.data:q}" \
+                                 --output "{output.output:q}"
+        """
+
+
+rule scan_cluster_size:
+    input:
+        script = 'scripts/merge_dataframes.py',
+        data = expand("scores/{N}x{N}_cluster{cluster_size}-{cluster_mean}/{seed_pair}.csv",
+                N=config.default_N,
+                cluster_size=config.cluster_size,
+                cluster_mean=config.cluster_mean,
+                seed_pair=config.seed_pairs)
+    output:
+        output = 'scores/scan_cluster_size.csv'
+    shell:
+        """
+        python3 {input.script:q} --input "{input.data:q}" \
+                                 --output "{output.output:q}"
+        """
+
+
+rule scan_rectangular_cluster_size:
+    input:
+        script = 'scripts/merge_dataframes.py',
+        data = expand("scores/{N}x{M}_cluster{cluster_size}-{cluster_mean}/{seed_pair}.csv",
+                N=config.default_N,
+                M=config.default_M,
+                cluster_size=config.cluster_size,
+                cluster_mean=config.cluster_mean,
+                seed_pair=config.seed_pairs)
+    output:
+        output = 'scores/scan_rectangular_cluster_size.csv'
+    shell:
+        """
+        python3 {input.script:q} --input "{input.data:q}" \
+                                 --output "{output.output:q}"
+        """
