@@ -1,0 +1,70 @@
+import config
+
+wildcard_constraints:
+    bkgr_correlation = '[\d\.]+',
+    seed = '\d+',
+    seed_a = '\d+',
+    seed_b = '\d+',
+
+rule all:
+    input:
+        'scores/matrix_comparisons.csv'
+
+rule generate_matrix:
+    input:
+        script = "scripts/generate_matrix.py"
+    output:
+        output = "matrices/N{N}x{bkgr_mean}+-{bkgr_var}_hub{hub_size}x{hub_mean}+-{hub_var}/{seed}.npy"
+    shell:
+        """
+        python3 {input.script:q} --output {output.output:q} \
+                                 --N {wildcards.N} \
+                                 --bkgr_mean {wildcards.bkgr_mean} \
+                                 --bkgr_var {wildcards.bkgr_var} \
+                                 --hub_size {wildcards.hub_size} \
+                                 --hub_mean {wildcards.hub_mean} \
+                                 --hub_var {wildcards.hub_var} \
+                                 --seed {wildcards.seed} \
+        """
+
+rule compare_matrices:
+    input:
+        script = "scripts/compare_matrices.py",
+        matrix_a = "matrices/N{N}x{bkgr_mean}+-{bkgr_var}_hub{hub_size}x{hub_mean}+-{hub_var}/{seed_a}.npy",
+        matrix_b = "matrices/N{N}x{bkgr_mean}+-{bkgr_var}_hub{hub_size}x{hub_mean}+-{hub_var}/{seed_b}.npy",
+    output:
+        output = "scores/N{N}x{bkgr_mean}+-{bkgr_var}_hub{hub_size}x{hub_mean}+-{hub_var}/{seed_a}-{seed_b}.csv"
+    shell:
+        """
+        python3 {input.script:q} --output {output.output:q} \
+                                 --matrix_a {input.matrix_a:q} \
+                                 --matrix_b {input.matrix_b:q} \
+                                 --N {wildcards.N} \
+                                 --bkgr_mean {wildcards.bkgr_mean} \
+                                 --bkgr_var {wildcards.bkgr_var} \
+                                 --hub_size {wildcards.hub_size} \
+                                 --hub_mean {wildcards.hub_mean} \
+                                 --hub_var {wildcards.hub_var} \
+                                 --seed_a {wildcards.seed_a} \
+                                 --seed_b {wildcards.seed_b} \
+        """
+
+
+rule merge_comparison_results:
+    input:
+        script = 'scripts/merge_dataframes.py',
+        data = expand("scores/N{N}x{bkgr_mean}+-{bkgr_var}_hub{hub_size}x{hub_mean}+-{hub_var}/{seed_pair}.csv",
+                N=config.N,
+                bkgr_mean=config.bkgr_mean,
+                bkgr_var=config.bkgr_var,
+                hub_size=config.hub_size,
+                hub_mean=config.hub_mean,
+                hub_var=config.hub_var,
+                seed_pair=config.seed_pairs)
+    output:
+        output = 'scores/matrix_comparisons.csv'
+    shell:
+        """
+        python3 {input.script:q} --input "{input.data:q}" \
+                                 --output "{output.output:q}"
+        """
