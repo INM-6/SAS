@@ -121,9 +121,8 @@ rule scan_network_size:
 rule scan_rectangular_network_size:
     input:
         script = 'scripts/merge_dataframes.py',
-        data = expand("scores/{N}x{M}_cluster{cluster_size}-{cluster_mean}/{seed_pair}.csv",
-                N=config.N,
-                M=config.default_N,
+        data = expand("scores/{NxM}_cluster{cluster_size}-{cluster_mean}/{seed_pair}.csv",
+                NxM=[f'{n}x{int(1.5*n)}' for n in config.N],
                 cluster_size=config.default_cluster_size,
                 cluster_mean=config.cluster_mean,
                 seed_pair=config.seed_pairs)

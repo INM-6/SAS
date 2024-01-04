@@ -4,10 +4,10 @@ import itertools
 
 N = [20, 40, 60, 80, 100, 200, 300, 400, 500, 600, 700, 800]
 default_N = 300
-default_M = default_N*2
+default_M = int(default_N*1.5)
 
 cluster_size = [5,10,15,20,25,30,35,40,45,50]
-default_cluster_size = 0.1 # corresponds to 10% of N
+default_cluster_size = 0.166 #50/300 # corresponds to 16.666% of N
 
 cluster_mean = [0,5,10,15]
 default_cluster_mean = 10
@@ -30,8 +30,8 @@ network_params = {
                 }
 
 # perturbations
-max_change_fraction = 0.1,
-step_size = 0.005,
+max_change_fraction = 0.1
+step_size = 0.005
 repetitions = 55
 
 
@@ -39,17 +39,17 @@ model_names = ['ER', 'DCM', '1C', '2C', 'WS', 'BA']
 
 titles = {
     'ER': 'Erdős-Rényi',
-    'DCM': 'Directed Configuration Model',
-    '1C': 'One Cluster',
-    '2C': 'Two Clusters',
-    '1Cs': 'One Cluster - Shuffled',
-    '2Cs': 'Two Clusters - Shuffled',
+    'DCM': 'Directed configuration model',
+    '1C': 'One cluster',
+    '2C': 'Two clusters',
+    '1Cs': 'One cluster - shuffled',
+    '2Cs': 'Two clusters - shuffled',
     'WS': 'Watts-Strogatz',
     'BA': 'Barabasi-Albert',
         }
 
 colors = {
-    'ER': '#4b38a5',
+    'ER': '#6151AC',
     'DCM': '#88CCEE',
     '1C': '#44AA99',
     '1Cs': '#999933',
