@@ -1,0 +1,16 @@
+name: singular_angles
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python >= 3.8
+  - pip >= 19.3.1
+  - snakemake
+  - pip:
+    - xarray
+    - pandas
+    - scipy
+    - matplotlib
+    - seaborn
+    - jupyter

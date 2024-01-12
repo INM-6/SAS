@@ -57,9 +57,10 @@ class Connectomes(SingularAngles):
             'BA': 'BA',
         }
 
-        self.mean_num_connections = {ms: (self.params['mean_connection_prob']
-                                          * self.params['size'][ms][0]
-                                          * self.params['size'][ms][1]) for ms in self.matrix_shapes}
+        # # not used !?
+        # self.mean_num_connections = {ms: (self.params['mean_connection_prob']
+        #                                   * self.params['size'][ms][0]
+        #                                   * self.params['size'][ms][1]) for ms in self.matrix_shapes}
 
         if 'DCM' in self.networks:
             self.indegrees = {}
@@ -72,6 +73,7 @@ class Connectomes(SingularAngles):
         mean_num_connections = self.params['mean_connection_prob'] * max_size * max_size
         connectome = np.ones((max_size, max_size))
         for cluster, rel_cluster_weight in zip(clusters, rel_cluster_weights):
+            print(cluster)
             connectome[cluster[0]:cluster[1], :][:, cluster[0]:cluster[1]] = rel_cluster_weight
         connectome = connectome / (np.sum(connectome) / mean_num_connections)
         matrix = (np.random.random((max_size, max_size)) < connectome).astype(int)

@@ -1,6 +1,7 @@
 calibration/matrices
-calibration/scores/N*
+calibration/scores/*/*.csv
 .snakemake
+snakejob.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
