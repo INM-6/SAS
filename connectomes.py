@@ -43,6 +43,7 @@ class Connectomes(SingularAngles):
             'DCM': '#88CCEE',
             '1C': '#44AA99',
             '2C': '#CC6677',
+            '2C_diff': '#D0A5AC',
             'WS': '#DDCC77',
             'BA': '#EE8866',
         }
@@ -486,6 +487,9 @@ class Connectomes(SingularAngles):
         if name == '2C':
             return self.clustered_connectome(self.params['size'][matrix_shape], self.params['2C']['clusters'],
                                              self.params['2C']['rel_cluster_weights'])
+        if name == '2C_diff':
+            return self.clustered_connectome(self.params['size'][matrix_shape], self.params['2C_diff']['clusters'],
+                                             self.params['2C_diff']['rel_cluster_weights'])
         if name == 'WS':
             return self.watts_strogatz(self.params['size'][matrix_shape], self.params['WS']['p'])
         if name == 'BA':
@@ -527,23 +531,91 @@ if __name__ == '__main__':
             'square': (300, 300),
             'rectangular': (450, 200)
         },
-        'WS': {'p': 0.3},
+        'WS': {'p': 1.},
         '1C': {'clusters': [(0, 50)], 'rel_cluster_weights': [10]},
         '2C': {'clusters': [(0, 35), (35, 50)], 'rel_cluster_weights': [10, 10]},
+        '2C_diff': {'clusters': [(0, 35), (50, 65)], 'rel_cluster_weights': [10, 10]},
     }
 
     matrix_shapes = ['square', 'rectangular']
     repetitions = 100
 
     connectomes = Connectomes(network_params=network_params)
+
     os.makedirs('plots', exist_ok=True)
 
     for matrix_shape in ['square', 'rectangular']:
         scores = connectomes.compare_networks(matrix_shape, score_name='scores_overlap')
         p_values, effect_sizes = connectomes.calc_statistics(scores)
-        # p_values_GT, effect_sizes_GT = connectomes.calc_statistics(scores_GT)
-
         connectomes.plot_connectome_similarity(scores, effect_sizes, p_values, matrix_shape)
-        # connectomes.plot_p_increase(scores_GT_increase, savename=f'p_value_increase_{matrix_shape}')
 
-    # connectomes.calculate_dropoff(max_change_fraction=0.1, step_size=0.05, repetitions=2, log=True)
+    connectomes.calculate_dropoff(max_change_fraction=0.1, step_size=0.05, repetitions=2, log=True)
+
+    # --------- EXPERIMENTS ----------
+
+    # weights = {}
+    # angles = {}
+    # smallness = {}
+    # sas = {}
+
+    # def angles_weights_smallness(matrix_a, matrix_b):
+    #     U_a, S_a, V_at = np.linalg.svd(matrix_a)
+    #     U_b, S_b, V_bt = np.linalg.svd(matrix_b)
+
+    #     # if the matrices are rectangular, disregard the singular vectors of the larger singular matrix that map to 0
+    #     dim_0, dim_1 = matrix_a.shape
+    #     if dim_0 < dim_1:
+    #         V_at = V_at[:dim_0, :]
+    #         V_bt = V_bt[:dim_0, :]
+    #     elif dim_0 > dim_1:
+    #         U_a = U_a[:, :dim_1]
+    #         U_b = U_b[:, :dim_1]
+
+    #     angles_noflip = (connectomes.angle(U_a, U_b, method='columns') +
+    #                      connectomes.angle(V_at, V_bt, method='rows')) / 2
+    #     angles_flip = np.pi - angles_noflip
+    #     angles = np.minimum(angles_noflip, angles_flip)
+    #     weights = (S_a + S_b) / 2
+
+    #     # if one singular vector projects to 0, discard it
+    #     zero_mask = (S_a > np.finfo(float).eps) | (S_b > np.finfo(float).eps)
+    #     weights = weights[zero_mask]
+    #     angles = angles[zero_mask]
+
+    #     weights /= np.sum(weights)
+    #     smallness = 1 - angles / (np.pi / 2)
+    #     weighted_smallness = smallness * weights
+    #     similarity_score = np.sum(weighted_smallness)
+    #     return angles, weights, smallness, similarity_score
+
+    # fig, ax = plt.subplots(1, 4, figsize=(15, 5))
+    # ax[0].set_title('weights')
+    # ax[1].set_title('angles')
+    # ax[2].set_title('smallness')
+
+    # reference = '2C'
+    # # for comparison in ['ER', 'DCM', '1C', '2C', 'WS', 'BA']:
+    # for comparison in ['2C', '2C_diff']:
+    #     weights[f'{reference}-{comparison}'] = np.zeros((repetitions, 300))
+    #     angles[f'{reference}-{comparison}'] = np.zeros((repetitions, 300))
+    #     smallness[f'{reference}-{comparison}'] = np.zeros((repetitions, 300))
+    #     sas[f'{reference}-{comparison}'] = np.zeros(repetitions)
+
+    #     for repetition in range(repetitions):
+    #         reference_matrix = connectomes.draw(reference, 'square')
+    #         comparison_matrix = connectomes.draw(comparison, 'square')
+    #         angles[f'{reference}-{comparison}'][repetition], weights[f'{reference}-{comparison}'][repetition], \
+    #             smallness[f'{reference}-{comparison}'][repetition], sas[f'{reference}-{comparison}'][repetition] = angles_weights_smallness(reference_matrix, comparison_matrix)
+
+    #     ax[0].errorbar(x=np.arange(300), y=np.mean(weights[f'{reference}-{comparison}'], axis=0), yerr=np.std(
+    #         weights[f'{reference}-{comparison}'], axis=0), label=f'{reference}-{comparison}', color=connectomes.colors[comparison])
+    #     ax[1].errorbar(x=np.arange(300), y=np.mean(angles[f'{reference}-{comparison}'], axis=0), yerr=np.std(
+    #         angles[f'{reference}-{comparison}'], axis=0), label=f'{reference}-{comparison}', color=connectomes.colors[comparison])
+    #     ax[2].errorbar(x=np.arange(300), y=np.mean(smallness[f'{reference}-{comparison}'], axis=0), yerr=np.std(
+    #         smallness[f'{reference}-{comparison}'], axis=0), label=f'{reference}-{comparison}', color=connectomes.colors[comparison])
+    #     ax[3].hist(sas[f'{reference}-{comparison}'], label=f'{reference}-{comparison}', color=connectomes.colors[comparison])
+
+    # ax[1].set_xlim(0, 4)
+    # ax[2].set_xlim(0, 4)
+    # ax[0].legend()
+    # plt.show()
