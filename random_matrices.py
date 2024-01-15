@@ -25,79 +25,85 @@ class RandomMatrices(SingularAngles):
 
         self.params = matrix_params
 
-        self.matrix_types = ['UG', 'CG', 'LRP', 'BN']
+        self.matrix_types = ['UN', 'CN', 'UN-LR', 'UN-B']
 
         self.titles = {
-            'UG': 'uncorrelated Gauss',
-            'CG': 'correlated Gauss',
-            'LRP': 'low-rank perturbation',
-            'BN': 'block-noise',
+            'UN': 'Uncorrelated normal',
+            'CN': 'Correlated normal',
+            'UN-LR': 'Uncorrelated normal\n with low-rank perturbations',
+            'UN-B': 'Uncorrelated normal\n with blocks',
         }
 
         self.colors = {
-            'UG': '#6151AC',
-            'CG': '#88CCEE',
-            'LRP': '#44AA99',
-            'BN': '#CC6677',
+            'UN': '#6151AC',
+            'CN': '#88CCEE',
+            'UN-LR': '#44AA99',
+            'UN-B': '#CC6677',
         }
 
+        self.perturb_vec = None
+
     def uncorr_gauss(self, dim, mean=0, var=None):
-        # if var is None:
-        #     var = 1 / dim
-        # # mat = np.random.multivariate_normal(mean, var, (dim, dim))
-        # mat = np.random.normal(mean, var, (dim, dim))
-        mat = np.random.random((dim, dim))
+        if var is None:
+            var = 1 / dim
+        mat = np.random.normal(mean, var, (dim, dim))
         return mat
 
-    def corr_gauss(self, dim, mean=0, cov_mat=None):
+    def corr_gauss(self, dim, mean=None, cov_mat=None):
 
-        # if cov_mat is None:
-        #     mat = np.random.normal(0, 1, dim)
-        #     cov_mat = 0.5 * (mat + mat.T) / dim
+        if mean is None:
+            mean = np.zeros(dim)
+        if cov_mat is None:
+            omega = 20
+            axis = np.linspace(-dim / 2, dim / 2, dim)
+            cov_mat = (np.exp(-np.abs(axis[:, np.newaxis] - axis[np.newaxis, :]) / dim)
+                       * np.cos(np.abs(axis[:, np.newaxis] - axis[np.newaxis, :]) * omega / dim) / dim**(1.85))
 
-        # mean = mean * np.ones(dim)
-        # mat = np.random.multivariate_normal(mean, cov_mat, dim)
-        mat = np.random.random((dim, dim))
+        mat_1 = np.random.multivariate_normal(mean, cov_mat, dim)
+        mat_2 = np.random.multivariate_normal(mean, cov_mat, dim)
+        mat = (mat_1 + mat_2.T) / 2
+
         return mat
 
-    def low_rank_perturb(self, dim, mean=0, var=None, perturb_vec=None):
+    def low_rank_perturb(self, dim, mean=0, var=None):
 
-        # if var is None:
-        #     var = 1 / dim
-        # if perturb_vec is None:
-        #     perturb_vec = np.random.bionmial(1, 0.25, dim)
+        if var is None:
+            var = 1 / dim
+        if self.perturb_vec is None:
+            self.perturb_vec = np.random.binomial(1, 0.5, dim) / np.sqrt(dim)
+        elif len(self.perturb_vec) != dim:
+            self.perturb_vec = np.random.binomial(1, 0.5, dim) / np.sqrt(dim)
 
-        # mat = np.random.normal(mean, var, (dim, dim))
-        # mat += np.outer(perturb_vec, perturb_vec)
-        mat = np.random.random((dim, dim))
+        mat = np.random.normal(mean, var, (dim, dim))
+        mat += np.outer(self.perturb_vec, self.perturb_vec)
         return mat
 
     def block_with_noise(self, dim, mean=0, var=None, block_dicts=None):
 
-        # if var is None:
-        #     var = 1 / dim
-        # if block_dicts is None:
-        #     block_dict_1 = {
-        #         'lower_row': 0,
-        #         'upper_row': 30,
-        #         'lower_column': 0,
-        #         'upper_column': 30,
-        #         'value': 0.3}
-        #     block_dict_2 = {
-        #         'lower_row': 60,
-        #         'upper_row': 90,
-        #         'lower_column': 50,
-        #         'upper_column': 70,
-        #         'value': -0.2}
-        #     block_dicts = [block_dict_1, block_dict_2]
+        if var is None:
+            var = 1 / dim
+        if block_dicts is None:
+            block_dict_1 = {
+                'lower_row': 0,
+                'upper_row': 30,
+                'lower_column': 0,
+                'upper_column': 30,
+                'value': 1 / dim}
+            block_dict_2 = {
+                'lower_row': 120,
+                'upper_row': 150,
+                'lower_column': 50,
+                'upper_column': 70,
+                'value': -1 / dim}
+            block_dicts = [block_dict_1, block_dict_2]
 
-        # mat = np.random.normal(mean, var, (dim, dim))
-        # for block_params in block_dicts:
-        #     block = np.zeros((dim, dim))
-        #     block[block_params['lower_row']:block_params['upper_row'],
-        #           block_params['lower_column']:block_params['upper_column']] = block_params['value']
-        #     mat += block
-        mat = np.random.random((dim, dim))
+        mat = np.random.normal(mean, var, (dim, dim))
+        for block_params in block_dicts:
+            block = np.zeros((dim, dim))
+            block[block_params['lower_row']:block_params['upper_row'],
+                  block_params['lower_column']:block_params['upper_column']] = block_params['value']
+            mat += block
+
         return mat
 
     # plotting
@@ -105,8 +111,8 @@ class RandomMatrices(SingularAngles):
     def plot_matrix(self, matrix, name, title, fig=None, ax=None, save=True, cmap='Greens', extend='neither'):
         if (fig is None) and (ax is None):
             fig, ax = plt.subplots()
-        im = ax.imshow(matrix, cmap=cmap, vmin=0, vmax=1)
-        fig.colorbar(im, ax=ax, ticks=[0.25, 0.75], extend=extend)
+        im = ax.imshow(matrix, cmap=cmap, norm=plt.Normalize(-np.max(np.abs(matrix)), np.max(np.abs(matrix))))
+        fig.colorbar(im, ax=ax, extend=extend)
         ax.set_title(title)
         if save:
             plt.savefig(f'plots/{name}.png', dpi=600)
@@ -185,27 +191,27 @@ class RandomMatrices(SingularAngles):
 
         # --- PLOT CONNECTOMES ---
         ax = ax_dict['A']
-        ax = self.plot_matrix(matrix=self.draw('UG'),
-                                   name='UG', title=matrix_type_titles['UG'], fig=fig, ax=ax, save=False,
-                                   cmap=self.colormap(self.colors['UG']))
+        ax = self.plot_matrix(matrix=self.draw('UN'),
+                              name='UN', title=matrix_type_titles['UN'], fig=fig, ax=ax, save=False,
+                              cmap=self.colormap(self.colors['UN']))
         ax.text(-0.1, 1.15, 'A', transform=ax.transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
 
         ax = ax_dict['B']
-        ax = self.plot_matrix(matrix=self.draw('CG'),
-                                   name='square_CG', title=matrix_type_titles['CG'], fig=fig, ax=ax, save=False,
-                                   cmap=self.colormap(self.colors['CG']))
+        ax = self.plot_matrix(matrix=self.draw('CN'),
+                              name='square_CN', title=matrix_type_titles['CN'], fig=fig, ax=ax, save=False,
+                              cmap=self.colormap(self.colors['CN']))
         ax.text(-0.1, 1.15, 'B', transform=ax.transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
 
         ax = ax_dict['C']
-        ax = self.plot_matrix(matrix=self.draw('LRP'),
-                                   name='square_LRP', title=matrix_type_titles['LRP'], fig=fig, ax=ax,
-                                   save=False, cmap=self.colormap(self.colors['LRP']))
+        ax = self.plot_matrix(matrix=self.draw('UN-LR'),
+                              name='square_UN-LR', title=matrix_type_titles['UN-LR'], fig=fig, ax=ax,
+                              save=False, cmap=self.colormap(self.colors['UN-LR']))
         ax.text(-0.1, 1.15, 'C', transform=ax.transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
 
         ax = ax_dict['D']
-        ax = self.plot_matrix(matrix=self.draw('BN'),
-                                   name='square_BN', title=matrix_type_titles['BN'], fig=fig, ax=ax,
-                                   save=False, cmap=self.colormap(self.colors['BN']))
+        ax = self.plot_matrix(matrix=self.draw('UN-B'),
+                              name='square_UN-B', title=matrix_type_titles['UN-B'], fig=fig, ax=ax,
+                              save=False, cmap=self.colormap(self.colors['UN-B']))
         ax.text(-0.1, 1.15, 'D', transform=ax.transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
 
         for matrix_type, axid in zip(self.matrix_types, ['a', 'b', 'c', 'd']):
@@ -232,7 +238,7 @@ class RandomMatrices(SingularAngles):
             ax.set_xlabel(r'$\theta$')
             for lbl, c in zip(ax.get_yticklabels(), tickcolors):
                 lbl.set_color(c)
-        plt.savefig('plots/matrix_types_and_similarity.pdf')
+        plt.savefig('plots/matrices_and_similarity.pdf')
 
     def plot_statistics(self, effect_sizes, p_values, ax, matrix_type):
 
@@ -341,13 +347,13 @@ class RandomMatrices(SingularAngles):
         for ax_i, dim in zip(['A', 'B', 'C'], dims):
             ax = ax_dict[ax_i]
             for matrix_type in self.matrix_types:
-                if matrix_type == 'UG':
+                if matrix_type == 'UN':
                     matrix = self.uncorr_gauss(dim)
-                elif matrix_type == 'CG':
+                elif matrix_type == 'CN':
                     matrix = self.corr_gauss(dim)
-                elif matrix_type == 'LRP':
+                elif matrix_type == 'UN-LR':
                     matrix = self.corr_gauss(dim)
-                elif matrix_type == 'BN':
+                elif matrix_type == 'UN-B':
                     matrix = self.corr_gauss(dim)
                 else:
                     continue
@@ -387,13 +393,13 @@ class RandomMatrices(SingularAngles):
         plt.savefig(f'plots/{savename}.pdf')
 
     def draw(self, name):
-        if name == 'UG':
+        if name == 'UN':
             return self.uncorr_gauss(self.params['dim'])
-        if name == 'CG':
+        if name == 'CN':
             return self.corr_gauss(self.params['dim'])
-        if name == 'LRP':
+        if name == 'UN-LR':
             return self.low_rank_perturb(self.params['dim'])
-        if name == 'BN':
+        if name == 'UN-B':
             return self.block_with_noise(self.params['dim'])
 
     def compare_matrix_types(self, score_name='scores', repetitions=100):
@@ -418,7 +424,7 @@ class RandomMatrices(SingularAngles):
 
 if __name__ == '__main__':
 
-    matrix_params = {'dim': 100}
+    matrix_params = {'dim': 300}
 
     random_matrices = RandomMatrices(matrix_params=matrix_params)
 
