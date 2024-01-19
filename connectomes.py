@@ -27,7 +27,6 @@ class Connectomes(SingularAngles):
         self.params = network_params
 
         self.networks = ['ER', 'DCM', '1C', '2C', 'WS', 'BA']
-        self.matrix_shapes = ['square', 'rectangular']
 
         self.titles = {
             'ER': 'Erdős-Rényi',
@@ -57,11 +56,6 @@ class Connectomes(SingularAngles):
             'BA': 'BA',
         }
 
-        # # not used !?
-        # self.mean_num_connections = {ms: (self.params['mean_connection_prob']
-        #                                   * self.params['size'][ms][0]
-        #                                   * self.params['size'][ms][1]) for ms in self.matrix_shapes}
-
         if 'DCM' in self.networks:
             self.indegrees = {}
             self.outdegrees = {}
@@ -73,7 +67,6 @@ class Connectomes(SingularAngles):
         mean_num_connections = self.params['mean_connection_prob'] * max_size * max_size
         connectome = np.ones((max_size, max_size))
         for cluster, rel_cluster_weight in zip(clusters, rel_cluster_weights):
-            print(cluster)
             connectome[cluster[0]:cluster[1], :][:, cluster[0]:cluster[1]] = rel_cluster_weight
         connectome = connectome / (np.sum(connectome) / mean_num_connections)
         matrix = (np.random.random((max_size, max_size)) < connectome).astype(int)
@@ -164,6 +157,12 @@ class Connectomes(SingularAngles):
         ax.set_xlabel('Source node')
         ax.set_ylabel('Target node')
         ax.set_title(title)
+        if np.shape(connectome)[0] == np.shape(connectome)[1]:
+            ax.set_xticks([0, 100, 200, 300])
+            ax.set_yticks([0, 100, 200, 300])
+        else:
+            ax.set_xticks([0, 100, 200])
+            ax.set_yticks([0, 100, 200, 300, 400])
         # cbar.ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
         if save:
             plt.savefig(f'plots/{name}.png', dpi=600)
@@ -376,92 +375,60 @@ class Connectomes(SingularAngles):
 
     # --- CALCULATE SIMILARITY FOR INCREASINGLY DIFFERENT MATRICES
 
-    def change_matrix(self, base_matrix, max_change_fraction=0.1, step_size=0.01, repetitions=5):
+    def change_matrix(self, base_matrix, change_range):
 
-        size = int(np.shape(base_matrix)[0] * np.shape(base_matrix)[1])
-        max_changes = int(size * max_change_fraction)
+        scores = np.zeros(len(change_range))
+        for i, change in enumerate(change_range):
+            changed_matrix = base_matrix.copy()
+            indices = list(product(np.arange(np.shape(changed_matrix)[0]),
+                                   np.arange(np.shape(changed_matrix)[1])))
+            if change > 0:
+                samples = random.sample(indices, change)
+                for coordinate in samples:
+                    if changed_matrix[coordinate] == 0:
+                        changed_matrix[coordinate] = 1
+                    else:
+                        changed_matrix[coordinate] = 0
+            scores[i] = self.compare(base_matrix, changed_matrix)
+        return scores
 
-        changes = []
-        similarity_mean = []
-        similarity_std = []
-        for change in np.insert(np.arange(max_changes + 1, step=size * step_size).astype(int),
-                                1, np.arange(1, 100, step=10)):
-            similarity = []
-            for rep in range(repetitions):
-                changed_matrix = base_matrix.copy()
-                indices = list(product(np.arange(np.shape(changed_matrix)[0]),
-                                       np.arange(np.shape(changed_matrix)[1])))
-                if change > 0:
-                    samples = random.sample(indices, change)
-                    for coordinate in samples:
-                        if changed_matrix[coordinate] == 0:
-                            changed_matrix[coordinate] = 1
-                        else:
-                            changed_matrix[coordinate] = 0
-                similarity.append(self.compare(base_matrix, changed_matrix))
-            similarity_mean.append(np.mean(similarity))
-            similarity_std.append(np.std(similarity))
-            changes.append(change)
+    def characterization(self, dim_range=np.linspace(100, 500, 21), max_change_fraction=0.1, step_size=0.005,
+                         repetitions=10, savename='similarity_under_changes', log=False):
 
-        similarity_mean = np.array(similarity_mean)
-        similarity_std = np.array(similarity_std)
-        changes = np.array(changes)
+        # increase size
 
-        return similarity_mean, similarity_std, changes, base_matrix
+        try:
+            dim_scores = xr.load_dataarray('increase_dim_scores_networks.nc').load()
+        except FileNotFoundError:
+            dim_scores = xr.DataArray(
+                np.zeros((len(self.networks), len(dim_range), repetitions)),
+                coords={'network': self.networks, 'dim': dim_range, 'repetition': np.arange(repetitions)},
+                dims=['network', 'dim', 'repetition'])
+            for dim in dim_range:
+                for network in self.networks:
+                    dim_scores.loc[network, int(dim), :] = [self.compare(self.draw(network, int(dim)),
+                                                                         self.draw(network, int(dim)))
+                                                            for _ in range(repetitions)]
+            dim_scores.to_netcdf('increase_dim_scores_networks.nc')
 
-    def calculate_dropoff(
-            self,
-            sizes=[(300, 300), (200, 450), (100, 900)],
-            connectome_types=['ER', 'DCM', '1C', '2C', 'WS', 'BA'],
-            max_change_fraction=0.1, step_size=0.005, repetitions=5,
-            savename='similarity_under_changes',
-            log=False):
-
-        mosaic = """
-            AAABBBCCC
-            """
-        fig = plt.figure(figsize=(int(len(sizes) * 5), 5), layout="constrained")
-        ax_dict = fig.subplot_mosaic(mosaic)
-
-        for ax_i, size in zip(['A', 'B', 'C'], sizes):
-            ax = ax_dict[ax_i]
-            for connectome_type in connectome_types:
-                if connectome_type == 'DCM':
-                    connectome = self.directed_configuration_model(size)
-                elif connectome_type == 'ER':
-                    connectome = self.erdos_renyi(size)
-                elif connectome_type == '1C':
-                    connectome = self.clustered_connectome(size=size, clusters=self.params['1C']['clusters'],
-                                                           rel_cluster_weights=self.params['1C']['rel_cluster_weights'])
-                elif connectome_type == '2C':
-                    connectome = self.clustered_connectome(size=size, clusters=self.params['2C']['clusters'],
-                                                           rel_cluster_weights=self.params['2C']['rel_cluster_weights'])
-                elif connectome_type == 'WS':
-                    connectome = self.watts_strogatz(size, self.params['WS']['p'])
-                elif connectome_type == 'BA':
-                    connectome = self.barabasi_albert(size)
-                else:
-                    continue
-                similarity_mean, similarity_std, changes, base_matrix = self.change_matrix(
-                    connectome, max_change_fraction, step_size, repetitions)
-                x = changes / (np.shape(base_matrix)[0] * np.shape(base_matrix)[1]) * 100
-                ax.plot(x, similarity_mean, color=self.colors[connectome_type], label=self.titles[connectome_type])
-                ax.fill_between(x, similarity_mean - similarity_std, similarity_mean + similarity_std, alpha=0.3,
-                                color=self.colors[connectome_type])
-                ax.set_title(f'Matrix shape: {size[0]} x {size[1]}')
-            ax.set_xlabel('% of changed connections')
-            ax.set_ylabel('SAS')
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            if log:
-                # ax.set_xscale('log')
-                ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
-                ax.set_yscale('log')
-            ax.set_box_aspect(1)
-        if log:
-            savename += '_log'
-        ax.legend(frameon=False, ncol=1, fontsize=12)
-        plt.savefig(f'plots/{savename}.png', dpi=600, bbox_inches='tight')
+        # increase number of changed connections
+        dim = self.params['size']['square'][0]
+        max_changes = int(dim**2 * max_change_fraction)
+        change_range = np.insert(np.arange(max_changes + 1, step=dim**2 * step_size).astype(int),
+                                 1, np.arange(1, 100, step=10))
+        try:
+            change_scores = xr.load_dataarray('increase_change_scores_networks.nc').load()
+        except FileNotFoundError:
+            change_scores = xr.DataArray(
+                np.zeros((len(self.networks), len(change_range), repetitions)),
+                coords={'network': self.networks, 'change': change_range /
+                        dim**2 * 100, 'repetition': np.arange(repetitions)},
+                dims=['network', 'change', 'repetition'])
+            for network in self.networks:
+                for repetition in range(repetitions):
+                    base_matrix = self.draw(network)
+                    change_scores.loc[network, :, repetition] = self.change_matrix(base_matrix, change_range)
+            change_scores.to_netcdf('increase_change_scores_networks.nc')
 
     def plot_p_increase(self, scores, savename, GT_increase='ER', increase=np.arange(3, 100, 5)):
         fig, ax = plt.subplots()
@@ -477,31 +444,36 @@ class Connectomes(SingularAngles):
         ax.set_ylabel('SAS')
         plt.savefig(f'plots/{savename}.pdf')
 
-    def draw(self, name, matrix_shape):
+    def draw(self, name, size=None, matrix_shape='square'):
+
+        if size is None:
+            size_tuple = self.params['size'][matrix_shape]
+        else:
+            size_tuple = (size, size)
 
         if name == 'ER':
-            return self.erdos_renyi(self.params['size'][matrix_shape])
+            return self.erdos_renyi(size_tuple)
         if name == 'DCM':
-            return self.directed_configuration_model(self.params['size'][matrix_shape])
+            return self.directed_configuration_model(size_tuple)
         if name == '1C':
-            return self.clustered_connectome(self.params['size'][matrix_shape], self.params['1C']['clusters'],
+            return self.clustered_connectome(size_tuple, self.params['1C']['clusters'],
                                              self.params['1C']['rel_cluster_weights'])
         if name == '2C':
-            return self.clustered_connectome(self.params['size'][matrix_shape], self.params['2C']['clusters'],
+            return self.clustered_connectome(size_tuple, self.params['2C']['clusters'],
                                              self.params['2C']['rel_cluster_weights'])
         if name == '2C_diff':
-            return self.clustered_connectome(self.params['size'][matrix_shape], self.params['2C_diff']['clusters'],
+            return self.clustered_connectome(size_tuple, self.params['2C_diff']['clusters'],
                                              self.params['2C_diff']['rel_cluster_weights'])
         if name == 'WS':
-            return self.watts_strogatz(self.params['size'][matrix_shape], self.params['WS']['p'])
+            return self.watts_strogatz(size_tuple, self.params['WS']['p'])
         if name == 'BA':
-            return self.barabasi_albert(self.params['size'][matrix_shape])
+            return self.barabasi_albert(size_tuple)
         if name == '1Cs':
-            graph = self.clustered_connectome(self.params['size'][matrix_shape], self.params['1C']['clusters'],
+            graph = self.clustered_connectome(size_tuple, self.params['1C']['clusters'],
                                               self.params['1C']['rel_cluster_weights'])
             return self._shuffle(graph)
         if name == '2Cs':
-            graph = self.clustered_connectome(self.params['size'][matrix_shape], self.params['2C']['clusters'],
+            graph = self.clustered_connectome(size_tuple, self.params['2C']['clusters'],
                                               self.params['2C']['rel_cluster_weights'])
             return self._shuffle(graph)
 
@@ -533,7 +505,7 @@ if __name__ == '__main__':
             'square': (300, 300),
             'rectangular': (450, 200)
         },
-        'WS': {'p': 1.},
+        'WS': {'p': 0.3},
         '1C': {'clusters': [(0, 50)], 'rel_cluster_weights': [10]},
         '2C': {'clusters': [(0, 35), (35, 50)], 'rel_cluster_weights': [10, 10]},
         '2C_diff': {'clusters': [(0, 35), (50, 65)], 'rel_cluster_weights': [10, 10]},
@@ -546,78 +518,9 @@ if __name__ == '__main__':
 
     os.makedirs('plots', exist_ok=True)
 
-    for matrix_shape in ['square', 'rectangular']:
+    for matrix_shape in matrix_shapes:
         scores = connectomes.compare_networks(matrix_shape, score_name='scores_overlap')
         p_values, effect_sizes = connectomes.calc_statistics(scores)
         connectomes.plot_connectome_similarity(scores, effect_sizes, p_values, matrix_shape)
 
-    connectomes.calculate_dropoff(max_change_fraction=0.1, step_size=0.05, repetitions=2, log=True)
-
-    # --------- EXPERIMENTS ----------
-
-    # weights = {}
-    # angles = {}
-    # smallness = {}
-    # sas = {}
-
-    # def angles_weights_smallness(matrix_a, matrix_b):
-    #     U_a, S_a, V_at = np.linalg.svd(matrix_a)
-    #     U_b, S_b, V_bt = np.linalg.svd(matrix_b)
-
-    #     # if the matrices are rectangular, disregard the singular vectors of the larger singular matrix that map to 0
-    #     dim_0, dim_1 = matrix_a.shape
-    #     if dim_0 < dim_1:
-    #         V_at = V_at[:dim_0, :]
-    #         V_bt = V_bt[:dim_0, :]
-    #     elif dim_0 > dim_1:
-    #         U_a = U_a[:, :dim_1]
-    #         U_b = U_b[:, :dim_1]
-
-    #     angles_noflip = (connectomes.angle(U_a, U_b, method='columns') +
-    #                      connectomes.angle(V_at, V_bt, method='rows')) / 2
-    #     angles_flip = np.pi - angles_noflip
-    #     angles = np.minimum(angles_noflip, angles_flip)
-    #     weights = (S_a + S_b) / 2
-
-    #     # if one singular vector projects to 0, discard it
-    #     zero_mask = (S_a > np.finfo(float).eps) | (S_b > np.finfo(float).eps)
-    #     weights = weights[zero_mask]
-    #     angles = angles[zero_mask]
-
-    #     weights /= np.sum(weights)
-    #     smallness = 1 - angles / (np.pi / 2)
-    #     weighted_smallness = smallness * weights
-    #     similarity_score = np.sum(weighted_smallness)
-    #     return angles, weights, smallness, similarity_score
-
-    # fig, ax = plt.subplots(1, 4, figsize=(15, 5))
-    # ax[0].set_title('weights')
-    # ax[1].set_title('angles')
-    # ax[2].set_title('smallness')
-
-    # reference = '2C'
-    # # for comparison in ['ER', 'DCM', '1C', '2C', 'WS', 'BA']:
-    # for comparison in ['2C', '2C_diff']:
-    #     weights[f'{reference}-{comparison}'] = np.zeros((repetitions, 300))
-    #     angles[f'{reference}-{comparison}'] = np.zeros((repetitions, 300))
-    #     smallness[f'{reference}-{comparison}'] = np.zeros((repetitions, 300))
-    #     sas[f'{reference}-{comparison}'] = np.zeros(repetitions)
-
-    #     for repetition in range(repetitions):
-    #         reference_matrix = connectomes.draw(reference, 'square')
-    #         comparison_matrix = connectomes.draw(comparison, 'square')
-    #         angles[f'{reference}-{comparison}'][repetition], weights[f'{reference}-{comparison}'][repetition], \
-    #             smallness[f'{reference}-{comparison}'][repetition], sas[f'{reference}-{comparison}'][repetition] = angles_weights_smallness(reference_matrix, comparison_matrix)
-
-    #     ax[0].errorbar(x=np.arange(300), y=np.mean(weights[f'{reference}-{comparison}'], axis=0), yerr=np.std(
-    #         weights[f'{reference}-{comparison}'], axis=0), label=f'{reference}-{comparison}', color=connectomes.colors[comparison])
-    #     ax[1].errorbar(x=np.arange(300), y=np.mean(angles[f'{reference}-{comparison}'], axis=0), yerr=np.std(
-    #         angles[f'{reference}-{comparison}'], axis=0), label=f'{reference}-{comparison}', color=connectomes.colors[comparison])
-    #     ax[2].errorbar(x=np.arange(300), y=np.mean(smallness[f'{reference}-{comparison}'], axis=0), yerr=np.std(
-    #         smallness[f'{reference}-{comparison}'], axis=0), label=f'{reference}-{comparison}', color=connectomes.colors[comparison])
-    #     ax[3].hist(sas[f'{reference}-{comparison}'], label=f'{reference}-{comparison}', color=connectomes.colors[comparison])
-
-    # ax[1].set_xlim(0, 4)
-    # ax[2].set_xlim(0, 4)
-    # ax[0].legend()
-    # plt.show()
+    connectomes.characterization(max_change_fraction=0.1, step_size=0.005, repetitions=10, log=True)
