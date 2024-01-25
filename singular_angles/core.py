@@ -1,32 +1,17 @@
 import numpy as np
-import numpy.random as rd
-import seaborn as sns
 
 
 class SingularAngles():
     """
     A class used to compare the similarity of non-symmetric matrices based on Singular Value Decomposition (SVD).
 
-    ...
-
-    Attributes
-    ----------
-    arg : any datatype
-        An argument that can be passed during the object instantiation.
-
     Methods
     -------
     compare(matrix_a, matrix_b):
         Compares two matrices using SVD and calculates their similarity score.
 
-    angle(a, b, method='columns'):
+    _angle(a, b, method='columns'):
         Calculates the angles between the row or column vectors of two matrices.
-
-    similarity(matrix_a, matrix_b, repetitions=100, repeat_a=False, repeat_b=False):
-        Draws samples from two matrices and computes their similarity scores.
-
-    draw(matrix, repetitions=100, repeat=False, method=rd.poisson):
-        Draws samples from the given matrix using a specific method.
 
     effect_size(sample_a, sample_b):
         Computes the effect size between two similarity distributions.
@@ -63,7 +48,7 @@ class SingularAngles():
             U_a = U_a[:, :dim_1]
             U_b = U_b[:, :dim_1]
 
-        angles_noflip = (self.angle(U_a, U_b, method='columns') + self.angle(V_at, V_bt, method='rows')) / 2
+        angles_noflip = (self._angle(U_a, U_b, method='columns') + self.angle(V_at, V_bt, method='rows')) / 2
         angles_flip = np.pi - angles_noflip
         angles = np.minimum(angles_noflip, angles_flip)
         weights = (S_a + S_b) / 2
@@ -79,7 +64,7 @@ class SingularAngles():
         similarity_score = np.sum(weighted_smallness)
         return similarity_score
 
-    def angle(self, a, b, method='columns'):
+    def _angle(self, a, b, method='columns'):
         """
          Calculates the angles between the row or column vectors of two matrices.
 
@@ -114,34 +99,6 @@ class SingularAngles():
 
         return angle
 
-    def draw(self, matrix, repetitions=100, repeat=False, method=rd.poisson):
-        """
-        Draws samples from the given matrix using a specific method.
-
-        Parameters
-        ----------
-        matrix : ndarray
-            Input matrix to draw samples from.
-        repetitions : int, optional
-            Number of times to draw samples, by default 100.
-        repeat : bool, optional
-            If True, repeats the matrix instead of drawing from it; by default False.
-        method : function, optional
-            Function used to draw samples, by default rd.poisson.
-
-        Returns
-        -------
-        list
-            List of drawn samples.
-        """
-        if method == 'identity':
-            return [matrix] * repetitions
-        else:
-            if repeat:
-                return [method(matrix)] * repetitions
-            else:
-                return [method(matrix) for i in range(repetitions)]
-
     def effect_size(self, dist_a, dist_b):
         """
         Computes the effect size between two similarity distributions.
@@ -165,34 +122,3 @@ class SingularAngles():
             sn = np.std(sample_b)
             return np.sqrt(((n - 1.) * s ** 2 + (nn - 1.) * sn ** 2) / (n + nn - 2.))
         return abs(np.mean(dist_a) - np.mean(dist_b)) / s_pooled(dist_a, dist_b)
-
-    def plot_similarities(self, similarity_scores, colors, labels, ax, legend=True):
-        """
-        Plots the histogram of similarity scores for each key in the similarity_scores dictionary.
-        The color and label for each key's histogram is provided by the colors and labels dictionaries.
-
-        Parameters
-        ----------
-        similarity_scores : dict
-            Dictionary with keys as the names of data groups and values as the similarity scores.
-        colors : dict
-            Dictionary with keys as the names of data groups and values as the colors for each group's histogram.
-        labels : dict
-            Dictionary with keys as the names of data groups and values as the labels for each group's histogram.
-        ax : matplotlib.axes.Axes
-            The axes object on which the histogram will be plotted.
-
-        Returns
-        -------
-        matplotlib.axes.Axes
-            The axes object with the plotted histogram.
-        """
-        for key, score in similarity_scores.items():
-            ax.hist(score, density=True, color=colors[key][1], label=labels[key],
-                    edgecolor=colors[key][0], linewidth=1.5, histtype="stepfilled")
-
-        if legend:
-            ax.legend()
-        ax.set_xlabel('similarity score')
-        ax.set_ylabel('probability density')
-        return ax
