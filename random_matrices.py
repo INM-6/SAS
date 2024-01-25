@@ -1,10 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 from matplotlib.colors import ListedColormap
-from itertools import product, combinations, combinations_with_replacement
+from itertools import combinations, combinations_with_replacement
 from singular_angles import SingularAngles
-import random
 from scipy import stats
 import xarray as xr
 import os
@@ -20,8 +18,11 @@ plt.rcParams['axes.labelsize'] = 15  # Adjust x and y-axis label size
 class RandomMatrices(SingularAngles):
     """docstring for RandomMatrices"""
 
-    def __init__(self, matrix_params):
+    def __init__(self, matrix_params=None):
         super(RandomMatrices, self).__init__()
+
+        if matrix_params is None:
+            matrix_params = {'size': {'square': (300, 300), 'rectangular': (450, 200)}}
 
         self.params = matrix_params
 
@@ -42,13 +43,6 @@ class RandomMatrices(SingularAngles):
             'UN-B': 'UN-B',
         }
 
-        self.network_labels = {
-            'UN': 'UN',
-            'CN': 'CN',
-            'UN-LR': 'UN-LR',
-            'UN-B': 'UN-B',
-        }
-
         self.colors = {
             'UN': '#8C8C96',
             'CN': '#1E6429',
@@ -58,34 +52,6 @@ class RandomMatrices(SingularAngles):
 
         self.perturb_vec = {}
 
-        self.network_colors = {
-            'ER': '#6151AC',
-            'DCM': '#88CCEE',
-            '1C': '#44AA99',
-            '2C': '#CC6677',
-            '2C_diff': '#D0A5AC',
-            'WS': '#DDCC77',
-            'BA': '#EE8866',
-        }
-
-        self.network_labels = {
-            'ER': 'ER',
-            'DCM': 'DCM',
-            '1C': 'OC',
-            '2C': 'TC',
-            'WS': 'WS',
-            'BA': 'BA',
-        }
-
-        self.network_titles = {
-            'ER': 'Erdős-Rényi',
-            'DCM': 'Directed configuration model',
-            '1C': 'One cluster',
-            '2C': 'Two clusters',
-            'WS': 'Watts-Strogatz',
-            'BA': 'Barabasi-Albert',
-        }
-
     def uncorr_gauss(self, size, mean=0, var=None):
         if var is None:
             var = 1 / np.sqrt(size[0] * size[1])
@@ -93,7 +59,6 @@ class RandomMatrices(SingularAngles):
         return mat
 
     def corr_gauss(self, size, mean=None, cov_mat=None):
-
         if mean is None:
             mean_0 = np.zeros(size[0])
             mean_1 = np.zeros(size[1])
@@ -102,47 +67,35 @@ class RandomMatrices(SingularAngles):
             axis_0 = np.linspace(-size[0] / 2, size[0] / 2, size[0])
             axis_1 = np.linspace(-size[1] / 2, size[1] / 2, size[1])
             cov_mat_0 = (np.exp(-np.abs(axis_0[:, np.newaxis] - axis_0[np.newaxis, :]) / size[0])
-                         * np.cos(np.abs(axis_0[:, np.newaxis] - axis_0[np.newaxis, :]) * omega / size[0]) / size[0]**(1.85))
+                         * np.cos(np.abs(axis_0[:, np.newaxis] - axis_0[np.newaxis, :]) * omega / size[0])
+                         / size[0]**(1.85))
             cov_mat_1 = (np.exp(-np.abs(axis_1[:, np.newaxis] - axis_1[np.newaxis, :]) / size[1])
-                         * np.cos(np.abs(axis_1[:, np.newaxis] - axis_1[np.newaxis, :]) * omega / size[1]) / size[1]**(1.85))
-        mat_0 = np.random.multivariate_normal(mean_0, cov_mat_0, size[1]) # -> shap (size[1], size[0])
-        mat_1 = np.random.multivariate_normal(mean_1, cov_mat_1, size[0]) # -> shap (size[0], size[1])
+                         * np.cos(np.abs(axis_1[:, np.newaxis] - axis_1[np.newaxis, :]) * omega / size[1])
+                         / size[1]**(1.85))
+        mat_0 = np.random.multivariate_normal(mean_0, cov_mat_0, size[1])  # -> shap (size[1], size[0])
+        mat_1 = np.random.multivariate_normal(mean_1, cov_mat_1, size[0])  # -> shap (size[0], size[1])
         mat = (mat_0.T + mat_1) / 2
 
         return mat
 
     def low_rank_perturb(self, size, mean=0, var=None):
-
         if var is None:
             var = 1 / np.sqrt(size[0] * size[1])
 
         mat = np.random.normal(mean, var, size)
-
         try:
             mat += np.outer(self.perturb_vec[size][:size[0]], self.perturb_vec[size][:size[1]])
         except KeyError:
             self.perturb_vec[size] = np.random.binomial(1, 0.5, np.max(size)) / np.sqrt(np.max(size))
             mat += np.outer(self.perturb_vec[size][:size[0]], self.perturb_vec[size][:size[1]])
-
         return mat
 
     def block_with_noise(self, size, mean=0, var=None, block_dicts=None):
-
         if var is None:
             var = 1 / np.sqrt(size[0] * size[1])
         if block_dicts is None:
-            block_dict_1 = {
-                'lower_row': 0,
-                'upper_row': 30,
-                'lower_column': 0,
-                'upper_column': 30,
-                'value': var}
-            block_dict_2 = {
-                'lower_row': 80,
-                'upper_row': 100,
-                'lower_column': 40,
-                'upper_column': 60,
-                'value': -var}
+            block_dict_1 = {'lower_row': 0, 'upper_row': 30, 'lower_column': 0, 'upper_column': 30, 'value': var}
+            block_dict_2 = {'lower_row': 80, 'upper_row': 100, 'lower_column': 40, 'upper_column': 60, 'value': -var}
             block_dicts = [block_dict_1, block_dict_2]
 
         mat = np.random.normal(mean, var, size)
@@ -370,18 +323,11 @@ class RandomMatrices(SingularAngles):
         return scores
 
     def characterization(self, dim_range=np.linspace(100, 500, 21), max_change_fraction=0.1, step_size=0.005,
-                         repetitions=10, savename='characterization', log=False):
-
-        mosaic = """
-            AAABBB
-            CCCDDD
-            """
-        fig = plt.figure(figsize=(9.5, 9.5), layout="constrained")
-        ax = fig.subplot_mosaic(mosaic)
+                         repetitions=10):
 
         # increase dimension
         try:
-            dim_scores = xr.load_dataarray('increase_dim_scores.nc').load()
+            dim_scores = xr.load_dataarray('results/increase_dim_scores_random_matrices.nc').load()
         except FileNotFoundError:
             dim_scores = xr.DataArray(
                 np.zeros((len(self.matrix_types), len(dim_range), repetitions)),
@@ -392,18 +338,7 @@ class RandomMatrices(SingularAngles):
                     dim_scores.loc[matrix_type, int(dim), :] = [self.compare(
                         self.draw(matrix_type, (int(dim), int(dim))), self.draw(matrix_type, (int(dim), int(dim))))
                         for _ in range(repetitions)]
-            dim_scores.to_netcdf('increase_dim_scores.nc')
-
-        for matrix_type in self.matrix_types:
-            mean = np.mean(dim_scores.loc[matrix_type], axis=-1)
-            std = np.std(dim_scores.loc[matrix_type], axis=-1)
-            ax['A'].plot(dim_range, mean, label=matrix_type, color=self.colors[matrix_type])
-            ax['A'].fill_between(dim_range, mean - std, mean + std, alpha=0.3, color=self.colors[matrix_type], lw=0)
-        ax['A'].set_xlabel(r'Dimensionality $N$')
-        ax['A'].set_ylabel('SAS')
-        ax['A'].spines['top'].set_visible(False)
-        ax['A'].spines['right'].set_visible(False)
-        ax['A'].text(-0.1, 1.15, 'A', transform=ax['A'].transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
+            dim_scores.to_netcdf('results/increase_dim_scores_random_matrices.nc')
 
         # increase number of changed connections
         size = self.params['size']['square'][0]**2
@@ -411,7 +346,7 @@ class RandomMatrices(SingularAngles):
         change_range = np.insert(np.arange(max_changes + 1, step=size * step_size).astype(int),
                                  1, np.arange(1, 100, step=10))
         try:
-            change_scores = xr.load_dataarray('increase_change_scores.nc').load()
+            change_scores = xr.load_dataarray('results/increase_change_scores_random_matrices.nc').load()
         except FileNotFoundError:
             change_scores = xr.DataArray(
                 np.zeros((len(self.matrix_types), len(change_range), repetitions)),
@@ -421,60 +356,7 @@ class RandomMatrices(SingularAngles):
                 for repetition in range(repetitions):
                     base_matrix = self.draw(matrix_type)
                     change_scores.loc[matrix_type, :, repetition] = self.change_matrix(base_matrix, change_range)
-            change_scores.to_netcdf('increase_change_scores.nc')
-
-        x = change_range / self.params['size']['square'][0]**2
-
-        for matrix_type in self.matrix_types:
-            mean = np.mean(change_scores.loc[matrix_type], axis=-1)
-            std = np.std(change_scores.loc[matrix_type], axis=-1)
-            ax['B'].plot(x, mean, color=self.colors[matrix_type], label=self.titles[matrix_type])
-            ax['B'].fill_between(x, mean - std, mean + std, alpha=0.3, color=self.colors[matrix_type], lw=0)
-        ax['B'].set_xlabel(r'relative variance of perturbation $f$')
-        ax['B'].set_ylabel('SAS')
-        ax['B'].spines['top'].set_visible(False)
-        ax['B'].spines['right'].set_visible(False)
-        # if log:
-        #     ax['B'].yaxis.set_major_formatter(ticker.ScalarFormatter())
-        #     ax['B'].set_yscale('log')
-        ax['B'].legend(frameon=False, ncol=1, fontsize=12, loc='upper right')
-        ax['B'].text(-0.1, 1.15, 'B', transform=ax['B'].transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
-
-        # ---- data from network models ----
-        dim_scores = xr.load_dataarray('increase_dim_scores_networks.nc').load()
-        change_scores = xr.load_dataarray('increase_change_scores_networks.nc').load()
-
-        for network in dim_scores.coords['network']:
-            network = str(network.values)
-            mean = np.mean(dim_scores.loc[network], axis=-1).values
-            std = np.std(dim_scores.loc[network], axis=-1).values
-            ax['C'].plot(dim_range, mean, label=self.network_labels[network], color=self.network_colors[network])
-            ax['C'].fill_between(dim_range, mean - std, mean + std, alpha=0.3, color=self.network_colors[network], lw=0)
-        ax['C'].set_xlabel(r'Network size $N$')
-        ax['C'].set_ylabel('SAS')
-        ax['C'].spines['top'].set_visible(False)
-        ax['C'].spines['right'].set_visible(False)
-        ax['C'].text(-0.1, 1.15, 'C', transform=ax['C'].transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
-
-        for network in change_scores.coords['network']:
-            network = str(network.values)
-            mean = np.mean(change_scores.loc[network], axis=-1)
-            std = np.std(change_scores.loc[network], axis=-1)
-            ax['D'].plot(change_scores.coords['change'].values, mean,
-                         color=self.network_colors[network], label=self.network_titles[network])
-            ax['D'].fill_between(change_scores.coords['change'].values, mean - std, mean +
-                                 std, alpha=0.3, color=self.network_colors[network], lw=0)
-        ax['D'].set_xlabel(r'fraction of changed connections $g$ [%]')
-        ax['D'].set_ylabel('SAS')
-        ax['D'].spines['top'].set_visible(False)
-        ax['D'].spines['right'].set_visible(False)
-        if log:
-            ax['D'].yaxis.set_major_formatter(ticker.ScalarFormatter())
-            ax['D'].set_yscale('log')
-        ax['D'].legend(frameon=False, ncol=1, fontsize=12, loc='upper right')
-        ax['D'].text(-0.1, 1.15, 'D', transform=ax['D'].transAxes, fontsize=18, fontweight='bold', va='top', ha='left')
-
-        plt.savefig(f'plots/{savename}.pdf', bbox_inches='tight')
+            change_scores.to_netcdf('results/increase_change_scores_random_matrices.nc')
 
     def draw(self, name, size=None, matrix_shape='square'):
         if size is None:
@@ -492,7 +374,7 @@ class RandomMatrices(SingularAngles):
 
         # 100 vs 100
         try:
-            scores = np.load(f'{score_name}_{matrix_shape}.npy', allow_pickle=True).item()
+            scores = np.load(f'results/{score_name}_{matrix_shape}.npy', allow_pickle=True).item()
             print('Scores found on disk. Continuing...')
         except FileNotFoundError:
             print('Scores not found on disk. Calculating...')
@@ -503,17 +385,16 @@ class RandomMatrices(SingularAngles):
                 scores[f'{rule_1}_{rule_2}'] = score
                 print(f"The similarity of {rule_1} and {rule_2} is {np.round(np.mean(score), 2)} ± "
                       f"{np.round(np.std(score), 2)}")
-            np.save(f'{score_name}_{matrix_shape}.npy', scores)
+            np.save(f'results/{score_name}_{matrix_shape}.npy', scores)
 
         return scores
 
 
 if __name__ == '__main__':
 
-    matrix_params = {'size': {'square': (300, 300), 'rectangular': (450, 200)}}
-    matrix_shapes = ['rectangular']
+    matrix_shapes = ['square', 'rectangular']
 
-    random_matrices = RandomMatrices(matrix_params=matrix_params)
+    random_matrices = RandomMatrices()
 
     os.makedirs('plots', exist_ok=True)
 
@@ -523,4 +404,4 @@ if __name__ == '__main__':
         p_values, effect_sizes = random_matrices.calc_statistics(scores)
         random_matrices.plot_matrix_type_similarity(scores, effect_sizes, p_values, matrix_shape)
 
-    # random_matrices.characterization(max_change_fraction=1.0, step_size=0.05, repetitions=5, log=True)
+    random_matrices.characterization(max_change_fraction=1.0, step_size=0.05, repetitions=5)

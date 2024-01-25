@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 from matplotlib.colors import ListedColormap
 from itertools import product, combinations, combinations_with_replacement
 from singular_angles import SingularAngles
@@ -21,8 +20,21 @@ plt.rcParams['axes.labelsize'] = 15  # Adjust x and y-axis label size
 class Connectomes(SingularAngles):
     """docstring for Connectomes"""
 
-    def __init__(self, network_params):
+    def __init__(self, network_params=None):
         super(Connectomes, self).__init__()
+
+        if network_params is None:
+            network_params = {
+                'mean_connection_prob': 0.1,
+                'size': {
+                    'square': (300, 300),
+                    'rectangular': (450, 200)
+                },
+                'WS': {'p': 0.3},
+                '1C': {'clusters': [(0, 50)], 'rel_cluster_weights': [10]},
+                '2C': {'clusters': [(0, 35), (35, 50)], 'rel_cluster_weights': [10, 10]},
+                '2C_diff': {'clusters': [(0, 35), (50, 65)], 'rel_cluster_weights': [10, 10]},
+            }
 
         self.params = network_params
 
@@ -393,12 +405,12 @@ class Connectomes(SingularAngles):
         return scores
 
     def characterization(self, dim_range=np.linspace(100, 500, 21), max_change_fraction=0.1, step_size=0.005,
-                         repetitions=10, savename='similarity_under_changes', log=False):
+                         repetitions=10):
 
         # increase size
 
         try:
-            dim_scores = xr.load_dataarray('increase_dim_scores_networks.nc').load()
+            dim_scores = xr.load_dataarray('results/increase_dim_scores_connectomes.nc').load()
         except FileNotFoundError:
             dim_scores = xr.DataArray(
                 np.zeros((len(self.networks), len(dim_range), repetitions)),
@@ -409,7 +421,7 @@ class Connectomes(SingularAngles):
                     dim_scores.loc[network, int(dim), :] = [self.compare(self.draw(network, int(dim)),
                                                                          self.draw(network, int(dim)))
                                                             for _ in range(repetitions)]
-            dim_scores.to_netcdf('increase_dim_scores_networks.nc')
+            dim_scores.to_netcdf('results/increase_dim_scores_connectomes.nc')
 
         # increase number of changed connections
         dim = self.params['size']['square'][0]
@@ -417,7 +429,7 @@ class Connectomes(SingularAngles):
         change_range = np.insert(np.arange(max_changes + 1, step=dim**2 * step_size).astype(int),
                                  1, np.arange(1, 100, step=10))
         try:
-            change_scores = xr.load_dataarray('increase_change_scores_networks.nc').load()
+            change_scores = xr.load_dataarray('results/increase_change_scores_connectomes.nc').load()
         except FileNotFoundError:
             change_scores = xr.DataArray(
                 np.zeros((len(self.networks), len(change_range), repetitions)),
@@ -428,21 +440,7 @@ class Connectomes(SingularAngles):
                 for repetition in range(repetitions):
                     base_matrix = self.draw(network)
                     change_scores.loc[network, :, repetition] = self.change_matrix(base_matrix, change_range)
-            change_scores.to_netcdf('increase_change_scores_networks.nc')
-
-    def plot_p_increase(self, scores, savename, GT_increase='ER', increase=np.arange(3, 100, 5)):
-        fig, ax = plt.subplots()
-        for network in self.networks:
-            scores_arr = scores[f'{GT_increase}-{network}']
-            mean, std = np.empty(len(scores_arr)), np.empty(len(scores_arr))
-            for i, obj in enumerate(scores_arr):
-                mean[i] = np.mean(obj)
-                std[i] = np.std(obj)
-            ax.plot(increase, mean, color=self.colors[network])
-            ax.fill_between(increase, mean - std, mean + std, color=self.colors[network], alpha=0.5)
-        ax.set_xlabel('Number of draws')
-        ax.set_ylabel('SAS')
-        plt.savefig(f'plots/{savename}.pdf')
+            change_scores.to_netcdf('results/increase_change_scores_connectomes.nc')
 
     def draw(self, name, size=None, matrix_shape='square'):
 
@@ -477,50 +475,38 @@ class Connectomes(SingularAngles):
                                               self.params['2C']['rel_cluster_weights'])
             return self._shuffle(graph)
 
-    def compare_networks(self, matrix_shape, score_name='scores', GT_increase='ER', increase=np.arange(3, 100, 5)):
+    def compare_networks(self, matrix_shape, repetitions, score_name='scores'):
 
         # 100 vs 100
         try:
-            scores = np.load(f'{score_name}_{matrix_shape}.npy', allow_pickle=True).item()
+            scores = np.load(f'results/{score_name}_{matrix_shape}.npy', allow_pickle=True).item()
             print('Scores found on disk. Continuing...')
         except FileNotFoundError:
             print('Scores not found on disk. Calculating...')
             scores = {}
             for rule_1, rule_2 in combinations_with_replacement(self.networks, 2):
-                score = [self.compare(self.draw(rule_1, matrix_shape),
-                                      self.draw(rule_2, matrix_shape)) for _ in range(repetitions)]
+                score = [self.compare(self.draw(rule_1, self.params['size'][matrix_shape]),
+                                      self.draw(rule_2, self.params['size'][matrix_shape])) for _ in range(repetitions)]
                 scores[f'{rule_1}-{rule_2}'] = score
                 print(f"The similarity of {rule_1} and {rule_2} is {np.round(np.mean(score), 2)} ± "
                       f"{np.round(np.std(score), 2)}")
-            np.save(f'{score_name}_{matrix_shape}.npy', scores)
+            np.save(f'results/{score_name}_{matrix_shape}.npy', scores)
 
         return scores
 
 
 if __name__ == '__main__':
 
-    network_params = {
-        'mean_connection_prob': 0.1,
-        'size': {
-            'square': (300, 300),
-            'rectangular': (450, 200)
-        },
-        'WS': {'p': 0.3},
-        '1C': {'clusters': [(0, 50)], 'rel_cluster_weights': [10]},
-        '2C': {'clusters': [(0, 35), (35, 50)], 'rel_cluster_weights': [10, 10]},
-        '2C_diff': {'clusters': [(0, 35), (50, 65)], 'rel_cluster_weights': [10, 10]},
-    }
-
     matrix_shapes = ['square', 'rectangular']
     repetitions = 100
 
-    connectomes = Connectomes(network_params=network_params)
+    connectomes = Connectomes()
 
     os.makedirs('plots', exist_ok=True)
 
     for matrix_shape in matrix_shapes:
-        scores = connectomes.compare_networks(matrix_shape, score_name='scores_overlap')
+        scores = connectomes.compare_networks(matrix_shape, repetitions, score_name='scores_connectomes')
         p_values, effect_sizes = connectomes.calc_statistics(scores)
         connectomes.plot_connectome_similarity(scores, effect_sizes, p_values, matrix_shape)
 
-    connectomes.characterization(max_change_fraction=0.1, step_size=0.005, repetitions=10, log=True)
+    connectomes.characterization(max_change_fraction=0.1, step_size=0.005, repetitions=10)
