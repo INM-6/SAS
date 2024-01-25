@@ -1,5 +1,5 @@
-# singular_angles
-Comparing the similarity of non-symmetric matrices based on Singular Value Decomposition
+# SAS: singular angle similarity
+Method for comparing the singular angle similarity of arbitrary matrices of the same shape, based on singular value decomposition.
 
 ## Installation
 ```bash
