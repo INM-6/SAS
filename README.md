@@ -68,3 +68,7 @@ cross_similarity = [sas.compare(matrices['normal_block_1'][i], matrices['normal_
 # effect size > 1 indicates statistical separability
 effect_size = sas.effect_size(self_similarity, cross_similarity)
 ```
+
+## Contact
+
+[Jasper Albers](mailto:j.albers@fz-juelich.de?subject=SAS)
