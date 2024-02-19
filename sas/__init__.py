@@ -15,12 +15,4 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 SPDX-License-Identifier: GPL-3.0-or-later
 """
 
-from setuptools import setup
-
-setup(
-    name='sas',
-    version='1.0',
-    description='Singular Angle Similarity',
-    packages=['sas'],
-    install_requires=['numpy'],
-)
+from .core import compare, effect_size
