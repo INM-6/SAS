@@ -23,4 +23,5 @@ setup(
     description='Singular Angle Similarity',
     packages=['sas'],
     install_requires=['numpy'],
+    tests_require=['pytest']
 )
