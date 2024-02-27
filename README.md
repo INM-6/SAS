@@ -20,7 +20,7 @@ Method for comparing the singular angle similarity of arbitrary matrices of the 
 
 ## Installation
 ```bash
-pip install -e .
+pip install .
 ```
 
 ## Example use
