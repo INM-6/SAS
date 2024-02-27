@@ -67,8 +67,18 @@ def compare(matrix_a, matrix_b, method='match_values'):
         return similarity_score
 
     elif method == 'match_vectors':
-        angles_U = np.arccos(U_a.T @ U_b)
-        angles_V = np.arccos(V_at @ V_bt.T)
+
+        product_U = U_a.T @ U_b
+        product_V = V_at @ V_bt.T
+
+        # catch floats that are slightly above 1 or below -1 due to machine precision
+        product_U[np.isclose(product_U, 1)] = 1
+        product_V[np.isclose(product_V, 1)] = 1
+        product_U[np.isclose(product_U, -1)] = -1
+        product_V[np.isclose(product_V, -1)] = -1
+
+        angles_U = np.arccos(product_U)
+        angles_V = np.arccos(product_V)
 
         angles_noflip = (angles_U + angles_V) / 2
         angles_flip = np.pi - angles_noflip
@@ -83,17 +93,13 @@ def compare(matrix_a, matrix_b, method='match_values'):
             minimal_angle = np.min(angles)
             index_0, index_1 = np.where(angles == minimal_angle)
 
-            # check that only one smallest angle is found
-            if (len(index_0) == 1) and (len(index_1) == 1):
-                weights[row] = np.sqrt(S_a[index_0] * S_b[index_1])
-            # else, only orthogonal vectors should be present
-            else:
-                if np.allclose(angles, np.pi / 2):
-                    # all remaining angles are identical to pi/2
-                    break
-                else:
-                    raise ValueError('More than two pairs of vectors have the same smallest angle < pi/2.')
+            # if multiple pairings exist with the same minimal value, pick random one
+            if (len(index_0) != 1):
+                index = np.random.choice(np.arange(len(index_0)))
+                index_0 = index_0[index]
+                index_1 = index_1[index]
 
+            weights[row] = np.sqrt(S_a[index_0] * S_b[index_1])
             angles = np.delete(angles, index_0, axis=0)
             angles = np.delete(angles, index_1, axis=1)
 
