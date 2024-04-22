@@ -28,8 +28,6 @@ Method for comparing the singular angle similarity of arbitrary matrices of the 
 
 The formal derivation of the measure and its properties is presented [here](link_to_paper). In particular, the linked manuscript provides cases for which SAS detects similarity where traditional measures such as the Frobenius norm or the cosine similarity fail.
 
-We recommend to use the `match_values` method of SAS, which is selected by default. When multiple singular values are close in magnitude and noise is present, it may be beneficial to select pairs of vectors based on their alignment rather than based on their singular value. Possible applications of this method, in this implementation called `match_vectors`, are discussed in the publication linked above.
-
 ## Installation
 ```bash
 pip install .

@@ -19,7 +19,7 @@ import numpy as np
 from .utils import angle
 
 
-def compare(matrix_a, matrix_b, method='match_values'):
+def compare(matrix_a, matrix_b):
     """
     Compares two matrices using SVD and calculates their similarity score.
 
